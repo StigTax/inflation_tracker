@@ -1,8 +1,8 @@
-"""changes model store and category
+"""Добавлены поля к базовай модели БД
 
-Revision ID: 515d0e071aac
+Revision ID: 3d61603d9b72
 Revises: 
-Create Date: 2025-12-05 00:39:37.229349
+Create Date: 2026-01-16 17:35:57.019958
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '515d0e071aac'
+revision: str = '3d61603d9b72'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -25,6 +25,8 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('to_create', sa.DateTime(), nullable=False),
+    sa.Column('to_update', sa.DateTime(), nullable=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('name')
     )
@@ -32,6 +34,8 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('to_create', sa.DateTime(), nullable=False),
+    sa.Column('to_update', sa.DateTime(), nullable=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('name')
     )
@@ -41,6 +45,8 @@ def upgrade() -> None:
     sa.Column('measure_type', sa.String(length=25), nullable=False),
     sa.Column('unit', sa.String(length=25), nullable=False),
     sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('to_create', sa.DateTime(), nullable=False),
+    sa.Column('to_update', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['category_id'], ['category.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -52,8 +58,9 @@ def upgrade() -> None:
     sa.Column('total_price', sa.Float(), nullable=False),
     sa.Column('unit_price', sa.Float(), nullable=False),
     sa.Column('comment', sa.Text(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('to_create', sa.DateTime(), nullable=False),
+    sa.Column('to_update', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['product_id'], ['product.id'], ),
     sa.ForeignKeyConstraint(['store_id'], ['store.id'], ),
     sa.PrimaryKeyConstraint('id')

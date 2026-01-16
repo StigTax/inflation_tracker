@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import datetime
 
 from app.core.db import get_session
 from app.models import Product
@@ -47,6 +48,24 @@ def update_product(
             product.measure_type = measure_type
         if unit is not None:
             product.unit = unit
+        product.to_update = datetime.utcnow()
         session.commit()
         session.refresh(product)
+        return product
+
+
+def get_product_by_id(
+    product_id: int,
+) -> Optional[Product]:
+    with get_session() as session:
+        product = session.get(
+            Product,
+            product_id
+        )
+        return product
+
+
+def get_list_product() -> list[Product]:
+    with get_session() as session:
+        product = session.query(Product).all()
         return product

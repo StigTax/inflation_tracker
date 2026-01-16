@@ -3,6 +3,7 @@ __pycache__/
 *.pyo
 
 .env
+.coverage
 *.db
 
 .vscode/

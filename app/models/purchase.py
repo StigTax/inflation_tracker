@@ -1,7 +1,7 @@
-from datetime import datetime, date
+from datetime import date
 
 from sqlalchemy import (
-    Column, Integer, DateTime, Date,
+    Column, Integer, Date,
     ForeignKey, Float, Text
 )
 from sqlalchemy.orm import relationship
@@ -43,8 +43,3 @@ class Purchase(Base):
         nullable=False
     )
     comment = Column(Text)
-    created_at = Column(
-        DateTime,
-        nullable=False,
-        default=datetime.utcnow
-    )

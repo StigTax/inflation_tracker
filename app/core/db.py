@@ -1,8 +1,9 @@
 import os
 from contextlib import contextmanager
 import re
+from datetime import datetime
 
-from sqlalchemy import Column, Integer, create_engine
+from sqlalchemy import Column, Integer, DateTime, create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base, declared_attr
 
 
@@ -17,6 +18,12 @@ class PreBase:
         return re.sub('(.)([A-Z][a-z]+)', r'\1_\2', s1).lower()
 
     id = Column(Integer, primary_key=True)
+    to_create = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
+    to_update = Column(DateTime, nullable=True)
 
 
 Base = declarative_base(cls=PreBase)

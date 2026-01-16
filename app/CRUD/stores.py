@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import datetime
 
 from app.core.db import get_session
 from app.models import Store
@@ -20,7 +21,7 @@ def create_store(
 
 
 def update_store(
-    store_id: [int],
+    store_id: int,
     *,
     name: Optional[str] = None,
     description: Optional[str] = None,
@@ -37,6 +38,24 @@ def update_store(
             store.name = name
         if description is not None:
             store.description = description
+        store.to_update = datetime.utcnow()
         session.commit()
         session.refresh(store)
         return store
+
+
+def get_store_by_id(
+    store_id: int,
+) -> Optional[Store]:
+    with get_session() as session:
+        store = session.get(
+            Store,
+            store_id
+        )
+        return store
+
+
+def get_list_store() -> list[Store]:
+    with get_session() as session:
+        stores = session.query(Store).all()
+        return stores
