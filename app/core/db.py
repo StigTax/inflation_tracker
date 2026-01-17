@@ -9,6 +9,9 @@ from sqlalchemy.orm import sessionmaker, declarative_base, declared_attr
 
 DB_URL = os.getenv('DB_URL', 'sqlite:///./test.db')
 
+_engine = None
+_SessionLocal = None
+
 
 class PreBase:
     @declared_attr
@@ -28,25 +31,35 @@ class PreBase:
 
 Base = declarative_base(cls=PreBase)
 
-engine = create_engine(
-    DB_URL,
-    connect_args=(
-        {'check_same_thread': False}
-        if DB_URL.startswith('sqlite') else {}
-    ),
-    future=True,
-)
 
-SessionLocal = sessionmaker(
-    engine,
-    autoflush=False,
-    expire_on_commit=False
-)
+def init_db(db_url: str, echo: bool = False):
+    global DB_URL, _engine, _SessionLocal
+
+    if db_url:
+        DB_URL = db_url
+
+    _engine = create_engine(
+        DB_URL,
+        echo=echo,
+        connect_args=(
+            {'check_same_thread': False} if DB_URL.startswith('sqlite') else {}
+        ),
+        future=True,
+    )
+
+    _SessionLocal = sessionmaker(
+        bind=_engine,
+        autoflush=False,
+        expire_on_commit=False
+    )
+
+
+init_db(DB_URL)
 
 
 @contextmanager
 def get_session():
-    session = SessionLocal()
+    session = _SessionLocal()
     try:
         yield session
     finally:

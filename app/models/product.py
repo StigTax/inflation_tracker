@@ -35,3 +35,15 @@ class Product(Base):
         'Purchase',
         back_populates='product',
     )
+
+    def __repr__(self) -> str:
+        return f'<Product id={self.id} name={self.name!r}>'
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "category": self.category,
+            "measure_type": self.measure_type,
+            "unit": self.unit
+        }
