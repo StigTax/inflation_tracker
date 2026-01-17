@@ -18,14 +18,14 @@ def test_update_purchase_total_price_and_quantity(purchase_product):
         purchase_id=purchase_product.id,
         total_price=140.0,
         quantity=3.0,
-        comment="Новый комментарий",
+        comment='Новый комментарий',
     )
 
     assert updated_purchase.id == purchase_product.id
     assert updated_purchase.total_price == pytest.approx(140.0)
     assert updated_purchase.quantity == pytest.approx(3.0)
     assert updated_purchase.unit_price == pytest.approx(140.0 / 3.0)
-    assert updated_purchase.comment == "Новый комментарий"
+    assert updated_purchase.comment == 'Новый комментарий'
 
 
 def test_get_purchase_by_id(purchase_product):
@@ -121,7 +121,7 @@ def test_update_purchase_date_in_future_raises_error(
             purchase_date=future_date,
         )
 
-    assert "в будущем" in str(exc_info.value)
+    assert 'в будущем' in str(exc_info.value)
 
 
 def test_create_purchase_with_negative_quantity_raises_error(
@@ -139,7 +139,7 @@ def test_create_purchase_with_negative_quantity_raises_error(
             purchase_date=date(2024, 3, 1),
         )
 
-    assert "Количество товара" in str(exc_info.value)
+    assert 'Количество товара' in str(exc_info.value)
 
 
 def test_create_purchase_with_zero_price_raises_error(
@@ -157,4 +157,4 @@ def test_create_purchase_with_zero_price_raises_error(
             purchase_date=date(2024, 3, 1),
         )
 
-    assert "Стоимость" in str(exc_info.value)
+    assert 'Стоимость' in str(exc_info.value)

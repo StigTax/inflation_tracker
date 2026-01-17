@@ -1,5 +1,3 @@
-import pytest
-
 from app.service import stores
 
 
@@ -17,7 +15,7 @@ def test_few_stores(few_stores):
 
 
 def test_get_store_by_id(single_store):
-    store = stores.get_store_by_id(single_store.id)
+    store = stores.get_store(single_store.id)
     assert store is not None
     assert store.id == single_store.id
     assert store.name == 'Магнит'
@@ -25,7 +23,7 @@ def test_get_store_by_id(single_store):
 
 
 def test_get_list_store(few_stores):
-    store_list = stores.get_list_store()
+    store_list = stores.list_stores()
     assert len(store_list) >= 3
     store_names = [store.name for store in store_list]
     assert 'Пятерочка' in store_names

@@ -1,9 +1,20 @@
 from datetime import date
 
 
+def ensure_item_exists(
+    item: object,
+    item_name: str,
+    item_id: int,
+) -> None:
+    if item is None:
+        raise ValueError(
+            f'{item_name} с ID {item_id} не найден.'
+        )
+
+
 def validate_date_not_in_future(date: date) -> None:
     if date is None:
-        return date.today()
+        date = date.today()
     if date > date.today():
         raise ValueError('Дата покупки не может быть в будущем.')
     return date

@@ -1,5 +1,3 @@
-import pytest
-
 from app.service import categories
 
 
@@ -18,7 +16,7 @@ def test_create_few_categories(few_categories):
 
 def test_update_category(category_food):
     updated_category = categories.update_category(
-        category_id=category_food.id,
+        category_food.id,
         name='Фрукты',
         description='Свежие фрукты'
     )
@@ -28,8 +26,8 @@ def test_update_category(category_food):
 
 
 def test_get_category_by_id(category_food):
-    fetched_category = categories.get_category_by_id(
-        category_id=category_food.id
+    fetched_category = categories.get_category(
+        category_food.id
     )
     assert fetched_category is not None
     assert fetched_category.id == category_food.id
@@ -38,7 +36,7 @@ def test_get_category_by_id(category_food):
 
 
 def test_get_list_category(few_categories):
-    category_list = categories.get_list_category()
+    category_list = categories.list_categories()
     assert len(category_list) == len(few_categories)
     category_ids = [category.id for category in category_list]
     for cat in few_categories:

@@ -1,116 +1,163 @@
 import os
-from datetime import date
+from datetime import date, timedelta
+from contextlib import contextmanager
 
 import pytest
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
-os.environ.setdefault('DB_URL', 'sqlite:///./test_db.db')
-
-from app.core.db import Base, engine, get_session
 from app.service import (
     categories, stores, products, purchases
 )
+from app.models import Category, Store, Product
+from app.core.db import Base
+
+DB_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "sqlite+pysqlite:///:memory:"
+)
+
+
+@pytest.fixture
+def engine():
+    engine = create_engine(
+        DB_URL,
+        future=True,
+        connect_args={'check_same_thread': False},
+        poolclass=StaticPool,
+    )
+
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+
+    yield engine
+
+    Base.metadata.drop_all(bind=engine)
+    engine.dispose()
 
 
 @pytest.fixture(autouse=True)
-def setup_database():
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    yield
+def override_get_session(monkeypatch, engine):
+    import app.core.db as db_module
 
+    TestingSessionLocal = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        expire_on_commit=False,
+        future=True,
+    )
 
-@pytest.fixture
-def db_session():
-    with get_session() as session:
-        yield session
+    @contextmanager
+    def _get_session():
+        session = TestingSessionLocal()
+        try:
+            yield session
+        finally:
+            session.close()
 
+    monkeypatch.setattr(db_module, "get_session", _get_session)
 
+    for mod_path in [
+        "app.service.categories",
+        "app.service.stores",
+        "app.service.products",
+        "app.service.purchases",
+    ]:
+        try:
+            mod = __import__(mod_path, fromlist=["get_session"])
+            monkeypatch.setattr(mod, "get_session", _get_session)
+        except ModuleNotFoundError:
+            pass
+
+# ---------- fixtures: categories ----------
 @pytest.fixture
 def category_food():
-    return categories.create_category(
-        name='Овощи',
-        description='Свежие овощи'
-    )
+    obj = Category(name="Овощи", description="Свежие овощи")
+    return categories.create_category(obj)
 
 
 @pytest.fixture
 def few_categories():
-    cat_1 = categories.create_category(
-        name='Напитки',
-        description='Соки и воды'
-    )
-    cat_2 = categories.create_category(
-        name='Молочные продукты',
-        description='Свежие молочные продукты'
-    )
-    cat_3 = categories.create_category(
-        name='Хлебобулочные изделия',
-    )
-    return [cat_1, cat_2, cat_3]
+    return [
+        categories.create_category(
+            Category(name="Напитки", description="Соки и воды")),
+        categories.create_category(
+            Category(
+                name="Молочные продукты",
+                description="Свежие молочные продукты"
+            )
+        ),
+        categories.create_category(Category(name="Хлебобулочные изделия")),
+    ]
 
 
+# ---------- fixtures: stores ----------
 @pytest.fixture
 def single_store():
-    return stores.create_store(
-        name='Магнит',
-        description='Магнит - магазин для всей семьи'
-    )
+    obj = Store(name="Магнит", description="Магнит - магазин для всей семьи")
+    return stores.create_store(obj)
 
 
 @pytest.fixture
 def few_stores():
-    store_1 = stores.create_store(
-        name='Пятерочка',
-        description='Пятерочка выручает'
-    )
-    store_2 = stores.create_store(
-        name='Яндекс.Лавка',
-    )
-    store_3 = stores.create_store(
-        name='Дикси',
-    )
-    return [store_1, store_2, store_3]
+    return [
+        stores.create_store(Store(
+            name="Пятерочка", description="Пятерочка выручает"
+        )),
+        stores.create_store(Store(name="Яндекс.Лавка")),
+        stores.create_store(Store(name="Дикси")),
+    ]
 
 
+# ---------- fixtures: products ----------
 @pytest.fixture
 def product_vegetable(category_food):
-    return products.create_product(
-        name='Огурцы',
+    obj = Product(
+        name="Огурцы",
         category_id=category_food.id,
-        measure_type='вес',
-        unit='кг',
+        measure_type="вес",
+        unit="кг",
     )
+    return products.create_product(obj)
+
 
 @pytest.fixture
 def product_no_category():
-    return products.create_product(
-        name='Вода минеральная',
+    obj = Product(
+        name="Вода минеральная",
         category_id=None,
-        measure_type='объем',
-        unit='л',
+        measure_type="объем",
+        unit="л",
     )
+    return products.create_product(obj)
 
 
 @pytest.fixture
 def few_products(category_food):
-    prod_1 = products.create_product(
-        name='Помидоры',
-        category_id=category_food.id,
-        measure_type='вес',
-        unit='кг',
-    )
-    prod_2 = products.create_product(
-        name='Морковь',
-        category_id=category_food.id,
-        measure_type='вес',
-        unit='кг',
-    )
-    prod_3 = products.create_product(
-        name='Капуста',
-        category_id=category_food.id,
-        measure_type='вес',
-        unit='кг',
-    )
-    return [prod_1, prod_2, prod_3]
+    return [
+        products.create_product(
+            Product(
+                name="Помидоры",
+                category_id=category_food.id,
+                measure_type="вес",
+                unit="кг",
+            )),
+        products.create_product(
+            Product(
+                name="Морковь",
+                category_id=category_food.id,
+                measure_type="вес",
+                unit="кг",
+            )),
+        products.create_product(
+            Product(
+                name="Капуста",
+                category_id=category_food.id,
+                measure_type="вес",
+                unit="кг"
+            )),
+        ]
 
 
 @pytest.fixture
@@ -125,6 +172,7 @@ def purchase_product(product_vegetable, few_stores):
     )
 
 
+# ---------- fixtures: purchases ----------
 @pytest.fixture
 def few_purchase_in_single_store(
     product_vegetable, single_store
@@ -176,35 +224,39 @@ def few_purchase_in_few_stores(
 
 @pytest.fixture
 def purchase_product_with_negative_quantity(product_vegetable, few_stores):
-    return purchases.create_purchase(
+    invalid_purchase = purchases.create_purchase(
         store_id=few_stores[0].id,
         product_id=product_vegetable.id,
         quantity=-1.0,
         price=90.0,
         purchase_date=date(2024, 3, 6),
     )
+    return invalid_purchase
+
 
 
 @pytest.fixture
 def purchase_product_with_zero_price(product_vegetable, few_stores):
-    return purchases.create_purchase(
+    zero_price_purchase = purchases.create_purchase(
         store_id=few_stores[0].id,
         product_id=product_vegetable.id,
         quantity=1.0,
         price=0.0,
         purchase_date=date(2024, 3, 6),
     )
+    return zero_price_purchase
 
 
 @pytest.fixture
 def purchase_product_in_future_date(
     product_vegetable, few_stores
 ):
-    future_date = date.today().replace(year=date.today().year + 1)
-    return purchases.create_purchase(
+    future_date = date.today() + timedelta(days=365)
+    invalid_date_purchase = purchases.create_purchase(
         store_id=few_stores[0].id,
         product_id=product_vegetable.id,
         quantity=1.0,
         price=90.0,
         purchase_date=future_date,
     )
+    return invalid_date_purchase

@@ -42,7 +42,7 @@ def test_update_product(product_vegetable, category_food):
 
 
 def test_get_product_by_id(product_vegetable):
-    product = products.get_product_by_id(product_vegetable.id)
+    product = products.get_product(product_vegetable.id)
     assert product is not None
     assert product.id == product_vegetable.id
     assert product.name == 'Огурцы'
@@ -52,7 +52,7 @@ def test_get_product_by_id(product_vegetable):
 
 
 def test_get_list_product(few_products):
-    product_list = products.get_list_product()
+    product_list = products.list_products()
     assert len(product_list) == 3
     product_names = [product.name for product in product_list]
     assert 'Помидоры' in product_names

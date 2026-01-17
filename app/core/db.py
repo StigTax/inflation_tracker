@@ -31,8 +31,8 @@ Base = declarative_base(cls=PreBase)
 engine = create_engine(
     DB_URL,
     connect_args=(
-        {"check_same_thread": False}
-        if DB_URL.startswith("sqlite") else {}
+        {'check_same_thread': False}
+        if DB_URL.startswith('sqlite') else {}
     ),
     future=True,
 )
