@@ -1,15 +1,17 @@
-from typing import Optional
+from __future__ import annotations
+
+from typing import Any, Optional
 
 from app.core.db import get_session
+from app.crud.stores import crud as store_crud
 from app.models import Store
-from app.crud.stores import crud
 
 
 def get_store(
     store_id: int,
 ) -> Optional[Store]:
     with get_session() as session:
-        store = crud.get_or_raise(
+        store = store_crud.get_or_raise(
             db=session,
             obj_id=store_id,
         )
@@ -19,10 +21,10 @@ def get_store(
 def list_stores(
     offset: int = 0,
     limit: int = 100,
-    order_by: Optional[str] = None,
+    order_by: Optional[Any] = None,
 ) -> list[Store]:
     with get_session() as session:
-        stores = crud.list(
+        stores = store_crud.list(
             db=session,
             offset=offset,
             limit=limit,
@@ -35,7 +37,7 @@ def create_store(
     store: Store,
 ) -> Store:
     with get_session() as session:
-        store = crud.create(
+        store = store_crud.create(
             db=session,
             obj_in=store,
         )
@@ -44,11 +46,10 @@ def create_store(
 
 def update_store(
     store_id: int,
-    **fields,
-
+    **fields: Any,
 ) -> Store:
     with get_session() as session:
-        store = crud.update(
+        store = store_crud.update(
             db=session,
             obj_id=store_id,
             **fields,
@@ -60,7 +61,7 @@ def delete_store(
     store_id: int,
 ) -> Store:
     with get_session() as session:
-        store = crud.delete(
+        store = store_crud.delete(
             db=session,
             obj_id=store_id,
         )

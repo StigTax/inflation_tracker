@@ -2,57 +2,35 @@ from __future__ import annotations
 
 import argparse
 
-from app.models import Unit
-from app.crud.units import crud as unit_crud
 from app.cli.common import print_item, print_list_items, session_scope
+from app.crud.units import crud as unit_crud
+from app.models import Unit
 
 
-def register_unit_commands(
-    subparsers: argparse._SubParsersAction
-) -> None:
+def register_unit_commands(subparsers: argparse._SubParsersAction) -> None:
     pars = subparsers.add_parser(
         'units',
         help='Управление единицами измерения (Е.И.) покупок.',
     )
-    subpars = pars.add_subparsers(
-        dest='action',
-        required=True,
-    )
+    subpars = pars.add_subparsers(dest='action', required=True)
 
-    add = subpars.add_parser(
-        'add',
-        help='Добавить единицу измерений.',
-    )
-    add.add_argument('unit', help='Единица измерения.')
+    add = subpars.add_parser('add', help='Добавить единицу измерений.')
+    add.add_argument('unit', help='Единица измерения (кг, л, шт и т.д.).')
     add.add_argument(
         '-mt',
         '--measure-type',
-        default=None,
-        help='Тип единицы измерения (Вес, Объем и т.д.). ',
+        required=True,
+        help='Тип единицы измерения (Вес, Объем и т.д.).',
     )
     add.set_defaults(func=cmd_add)
 
     lst = subpars.add_parser('list', help='Список единиц измерений')
-    lst.add_argument(
-        '-o',
-        '--offset',
-        type=int,
-        default=0,
-        help='Смещение для пагинации (по умолчанию 0).',
-    )
-    lst.add_argument(
-        '-l',
-        '--limit',
-        type=int,
-        default=100,
-        help='Лимит для пагинации (по умолчанию 100).',
-    )
-    lst.add_argument(
-        '--order',
-        choices=('id', 'unit'),
-        default='id',
-        help='Поле сортировки.',
-    )
+    lst.add_argument('-o', '--offset', type=int, default=0,
+                     help='Смещение для пагинации (по умолчанию 0).')
+    lst.add_argument('-l', '--limit', type=int, default=100,
+                     help='Лимит для пагинации (по умолчанию 100).')
+    lst.add_argument('--order', choices=('id', 'unit'), default='id',
+                     help='Поле сортировки.')
     lst.set_defaults(func=cmd_list)
 
     get = subpars.add_parser('get', help='Получить ед. изм. по id')
@@ -80,12 +58,8 @@ def cmd_add(args: argparse.Namespace) -> None:
 def cmd_list(args: argparse.Namespace) -> None:
     with session_scope() as db:
         order_col = Unit.id if args.order == 'id' else Unit.unit
-        items = unit_crud.list(
-            db=db,
-            offset=args.offset,
-            limit=args.limit,
-            order_by=order_col,
-        )
+        items = unit_crud.list(db=db, offset=args.offset,
+                               limit=args.limit, order_by=order_col)
         print_list_items(items)
 
 

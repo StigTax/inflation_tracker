@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import date
 
 from sqlalchemy import (
@@ -19,6 +21,7 @@ class Purchase(Base):
     store_id = Column(
         Integer,
         ForeignKey('store.id'),
+        nullable=True,
         comment='ID магазина',
     )
     purchase_date = Column(
@@ -55,14 +58,15 @@ class Purchase(Base):
     )
 
     def to_dict(self) -> dict:
-        data = {
-            "id": self.id,
-            "purchase_date": str(self.purchase_date),
-            "product": self.product.name,
-            "store": self.store.name,
-            "quantity": self.quantity,
-            "total_price": self.total_price,
-            "unit_ptice": self.unit_price,
-            "comment": self.comment,
+        return {
+            'id': self.id,
+            'purchase_date': self.purchase_date,
+            'product_id': self.product_id,
+            'product': getattr(self.product, 'name', None),
+            'store_id': self.store_id,
+            'store': getattr(self.store, 'name', None),
+            'quantity': self.quantity,
+            'total_price': self.total_price,
+            'unit_price': self.unit_price,
+            'comment': self.comment,
         }
-        return data

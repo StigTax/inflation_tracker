@@ -1,15 +1,16 @@
+from __future__ import annotations
+
+from datetime import date
 from typing import Optional
-from datetime import datetime, date
 
 from app.core.db import get_session
+from app.crud.purchases import crud as purchase_crud
 from app.models import Purchase
-from app.validate.validators import (
-    validate_date_not_in_future, validate_positive_value
-)
-from app.crud.purchases import crud
+from app.validate.validators import validate_date_not_in_future, validate_positive_value
 
 
 def create_purchase(
+    *,
     store_id: int,
     product_id: int,
     quantity: float,
@@ -17,69 +18,54 @@ def create_purchase(
     purchase_date: Optional[date] = None,
     comment: Optional[str] = None,
 ) -> Purchase:
-    quantity = validate_positive_value(
-        quantity,
-        'Количество товара'
-    )
-    price = validate_positive_value(
-        price,
-        'Стоимость товара'
-    )
+    quantity = validate_positive_value(quantity, 'Количество товара')
+    price = validate_positive_value(price, 'Стоимость товара')
 
+    purchase_date = validate_date_not_in_future(purchase_date)
     unit_price = price / quantity
-    purchase_date = validate_date_not_in_future(purchase_date) or date.today()
 
-    with get_session() as session:
+    with get_session() as db:
         purchase = Purchase(
             store_id=store_id,
             product_id=product_id,
             quantity=quantity,
             total_price=price,
             unit_price=unit_price,
-            purchase_date=purchase_date or date.today(),
+            purchase_date=purchase_date,
             comment=comment,
         )
-        purchase = crud.create(db=session, obj_in=purchase, commit=False)
-        session.commit()
-        session.refresh(purchase)
-        return purchase
+        # ВАЖНО: commit=True, иначе id останется None
+        return purchase_crud.create(db=db, obj_in=purchase, commit=True)
 
 
 def update_purchase(
+    *,
     purchase_id: int,
+    store_id: Optional[int] = None,
+    product_id: Optional[int] = None,
     total_price: Optional[float] = None,
     quantity: Optional[float] = None,
     comment: Optional[str] = None,
     purchase_date: Optional[date] = None,
 ) -> Purchase:
-    with get_session() as session:
-        purchase = crud.get_or_raise(
-            db=session,
-            obj_id=purchase_id,
-        )
+    need_recalc = False
 
-        need_recalc = False
-        if total_price is not None:
-            total_price = validate_positive_value(
-                total_price,
-                'Стоимость товара'
-            )
-            need_recalc = True
-        if quantity is not None:
-            quantity = validate_positive_value(
-                quantity,
-                'Количество товара'
-            )
-            need_recalc = True
+    if total_price is not None:
+        total_price = validate_positive_value(total_price, 'Стоимость товара')
+        need_recalc = True
+    if quantity is not None:
+        quantity = validate_positive_value(quantity, 'Количество товара')
+        need_recalc = True
+    if purchase_date is not None:
+        purchase_date = validate_date_not_in_future(purchase_date)
 
-        if purchase_date is not None:
-            purchase_date = validate_date_not_in_future(
-                purchase_date
-            )
-        purchase = crud.update(
-            db=session,
+    with get_session() as db:
+        purchase = purchase_crud.update(
+            db=db,
             obj_id=purchase_id,
             commit=False,
+            store_id=store_id,
+            product_id=product_id,
             total_price=total_price,
             quantity=quantity,
             comment=comment,
@@ -87,24 +73,17 @@ def update_purchase(
         )
 
         if need_recalc:
-            purchase.unit_price = (
-                purchase.total_price / purchase.quantity
-            )
+            purchase.unit_price = purchase.total_price / purchase.quantity
 
-        session.commit()
-        session.refresh(purchase)
+        db.commit()
+        db.refresh(purchase)
         return purchase
 
 
-def get_purchase_by_id(
-    purchase_id: int,
-) -> Optional[Purchase]:
-    with get_session() as session:
-        purchase = session.get(
-            Purchase,
-            purchase_id
-        )
-        return purchase
+def get_purchase_by_id(purchase_id: int) -> Purchase:
+    with get_session() as db:
+        # ключевое: строго keyword-аргументы, db должен быть Session
+        return purchase_crud.get_with_normal_attr_or_raise(db=db, obj_id=purchase_id)
 
 
 def get_purchase_by_product(
@@ -112,31 +91,25 @@ def get_purchase_by_product(
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
 ) -> list[Purchase]:
-    with get_session() as session:
-        query = session.query(Purchase).filter(
-            Purchase.product_id == product_id
+    with get_session() as db:
+        return purchase_crud.get_purchase_by_product(
+            db=db,
+            product_id=product_id,
+            date_from=from_date,
+            date_to=to_date,
         )
-        if from_date is not None:
-            query = query.filter(Purchase.purchase_date >= from_date)
-        if to_date is not None:
-            query = query.filter(Purchase.purchase_date <= to_date)
-        query = query.order_by(Purchase.purchase_date)
-        return query.all()
 
 
-def get_purchase_by_store(
-    store_id: int
-) -> list[Purchase]:
-    with get_session() as session:
-        purchases = session.query(Purchase).filter(
-            Purchase.store_id == store_id
-        ).order_by(Purchase.purchase_date).all()
-        return purchases
+def get_purchase_by_store(store_id: int) -> list[Purchase]:
+    with get_session() as db:
+        return purchase_crud.get_purchase_by_store(db=db, store_id=store_id)
 
 
-def get_list_purchase() -> list[Purchase]:
-    with get_session() as session:
-        purchases = session.query(Purchase).order_by(
-            Purchase.purchase_date
-        ).all()
-        return purchases
+def get_list_purchase(offset: int = 0, limit: int = 100) -> list[Purchase]:
+    with get_session() as db:
+        return purchase_crud.list(
+            db=db,
+            offset=offset,
+            limit=limit,
+            order_by=Purchase.purchase_date,
+        )

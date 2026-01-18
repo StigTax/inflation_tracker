@@ -1,15 +1,17 @@
-from typing import Optional
+from __future__ import annotations
+
+from typing import Any, Optional
 
 from app.core.db import get_session
+from app.crud.categories import crud as category_crud
 from app.models import Category
-from app.crud.categories import crud
 
 
 def get_category(
     category_id: int,
 ) -> Optional[Category]:
     with get_session() as session:
-        category = crud.get_or_raise(
+        category = category_crud.get_or_raise(
             db=session,
             obj_id=category_id,
         )
@@ -19,10 +21,10 @@ def get_category(
 def list_categories(
     offset: int = 0,
     limit: int = 100,
-    order_by: Optional[str] = None,
+    order_by: Optional[Any] = None,
 ) -> list[Category]:
     with get_session() as session:
-        categories = crud.list(
+        categories = category_crud.list(
             db=session,
             offset=offset,
             limit=limit,
@@ -35,7 +37,7 @@ def create_category(
     category: Category,
 ) -> Category:
     with get_session() as session:
-        category = crud.create(
+        category = category_crud.create(
             db=session,
             obj_in=category,
         )
@@ -44,11 +46,10 @@ def create_category(
 
 def update_category(
     category_id: int,
-    **fields,
-
+    **fields: Any,
 ) -> Category:
     with get_session() as session:
-        category = crud.update(
+        category = category_crud.update(
             db=session,
             obj_id=category_id,
             **fields,
@@ -60,7 +61,7 @@ def delete_category(
     category_id: int,
 ) -> Category:
     with get_session() as session:
-        category = crud.delete(
+        category = category_crud.delete(
             db=session,
             obj_id=category_id,
         )

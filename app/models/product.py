@@ -1,6 +1,9 @@
+from __future__ import annotations
 from sqlalchemy import (
-    Column, Integer, String,
-    ForeignKey
+    Column,
+    Integer,
+    String,
+    ForeignKey,
 )
 from sqlalchemy.orm import relationship
 
@@ -15,7 +18,8 @@ class Product(Base):
     )
     category_id = Column(
         Integer,
-        ForeignKey('category.id')
+        ForeignKey('category.id'),
+        nullable=True,
     )
     unit_id = Column(
         Integer,
@@ -38,14 +42,17 @@ class Product(Base):
     )
 
     def __repr__(self) -> str:
-        return self.name
+        return f'{self.name}'
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id,
-            "name": self.name,
-            "category": self.category,
-            "unit": self.unit
+            'id': self.id,
+            'name': self.name,
+            'category_id': self.category_id,
+            'category': getattr(self.category, 'name', None),
+            'unit_id': self.unit_id,
+            'measure_type': getattr(self.unit, 'measure_type', None),
+            'unit': getattr(self.unit, 'unit', None),
         }
 
 
@@ -68,7 +75,7 @@ class Unit(Base):
     )
 
     def __repr__(self) -> str:
-        return self.unit
+        return f'{self.measure_type} ({self.unit})'
 
     def to_dict(self) -> dict:
         return {

@@ -29,6 +29,7 @@ def parse_date(value: str) -> date:
             f'Неверный формат даты: {value}. '
             'Ожидается формат ГГГГ-ММ-ДД.'
         )
+    return value
 
 
 def print_item(obj: Any) -> None:

@@ -2,63 +2,45 @@ from __future__ import annotations
 
 import argparse
 
-from app.models import Product
+from app.cli.common import (
+    print_item, print_list_items, session_scope, parse_date
+)
 from app.crud.products import crud as product_crud
-from app.cli.common import print_item, print_list_items, session_scope
+from app.models import Product
 
 
-def register_product_commands(
-    subparsers: argparse._SubParsersAction
-) -> None:
+def register_product_commands(subparsers: argparse._SubParsersAction) -> None:
     pars = subparsers.add_parser(
         'product',
         help='Управление продуктами.',
     )
-    subpars = pars.add_subparsers(
-        dest='action',
-        required=True,
-    )
+    subpars = pars.add_subparsers(dest='action', required=True)
 
-    add = subpars.add_parser(
-        'add',
-        help='Добавить продукт.',
-    )
+    add = subpars.add_parser('add', help='Добавить продукт.')
     add.add_argument('name', help='Название продукта.')
     add.add_argument(
         '-c',
         '--category-id',
+        type=int,
         default=None,
-        help='Категория продукта (ID).',
+        help='Категория продукта (ID). (опционально)',
     )
     add.add_argument(
         '-u',
         '--unit-id',
-        default=None,
-        help='Единица измерения продукта (ID).',
+        type=int,
+        required=True,
+        help='Единица измерения продукта (ID). (обязательно)',
     )
     add.set_defaults(func=cmd_add)
 
     lst = subpars.add_parser('list', help='Список продуктов')
-    lst.add_argument(
-        '-o',
-        '--offset',
-        type=int,
-        default=0,
-        help='Смещение для пагинации (по умолчанию 0).',
-    )
-    lst.add_argument(
-        '-l',
-        '--limit',
-        type=int,
-        default=100,
-        help='Лимит для пагинации (по умолчанию 100).',
-    )
-    lst.add_argument(
-        '--order',
-        choices=('id', 'name'),
-        default='id',
-        help='Поле сортировки.',
-    )
+    lst.add_argument('-o', '--offset', type=int, default=0,
+                     help='Смещение для пагинации (по умолчанию 0).')
+    lst.add_argument('-l', '--limit', type=int, default=100,
+                     help='Лимит для пагинации (по умолчанию 100).')
+    lst.add_argument('--order', choices=('id', 'name'), default='id',
+                     help='Поле сортировки.')
     lst.set_defaults(func=cmd_list)
 
     get = subpars.add_parser('get', help='Получить продукт по id')
@@ -92,11 +74,7 @@ def cmd_list(args: argparse.Namespace) -> None:
     with session_scope() as db:
         order_col = Product.id if args.order == 'id' else Product.name
         items = product_crud.list(
-            db=db,
-            offset=args.offset,
-            limit=args.limit,
-            order_by=order_col,
-        )
+            db=db, offset=args.offset, limit=args.limit, order_by=order_col)
         print_list_items(items)
 
 
