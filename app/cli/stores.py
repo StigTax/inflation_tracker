@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 
 from app.models import Store
-from app.service.stores import crud as store_crud
+from app.crud.stores import crud as store_crud
 from app.cli.common import print_item, print_list_items, session_scope
 
 

@@ -19,7 +19,8 @@ class Product(Base):
     )
     unit_id = Column(
         Integer,
-        ForeignKey('unit.id')
+        ForeignKey('unit.id'),
+        nullable=False,
     )
 
     #  ----- Связи -----
@@ -31,7 +32,7 @@ class Product(Base):
         'Purchase',
         back_populates='product',
     )
-    units = relationship(
+    unit = relationship(
         'Unit',
         back_populates='product',
     )
@@ -44,7 +45,6 @@ class Product(Base):
             "id": self.id,
             "name": self.name,
             "category": self.category,
-            "measure_type": self.measure_type,
             "unit": self.unit
         }
 
@@ -61,8 +61,14 @@ class Unit(Base):
         comment='Единица измерения',
     )
 
+    #  ----- Связи -----
+    product = relationship(
+        'Product',
+        back_populates='unit',
+    )
+
     def __repr__(self) -> str:
-        return f'<Unit id={self.id} name={self.name!r}>'
+        return f'<Unit id={self.id} unit={self.unit!r}>'
 
     def to_dict(self) -> dict:
         return {

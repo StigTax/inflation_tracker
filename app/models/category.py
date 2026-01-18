@@ -11,8 +11,16 @@ class Category(Base):
         unique=True,
         comment='Название категории',
     )
-    description = Column(Text, comment='Описание категории')
-    products = relationship('Product', back_populates='category')
+    description = Column(
+        Text,
+        comment='Описание категории'
+    )
+
+    #  ----- Связи -----
+    products = relationship(
+        'Product',
+        back_populates='category'
+    )
 
     def __repr__(self) -> str:
         return f'<Category id={self.id} name={self.name!r}>'

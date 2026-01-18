@@ -44,7 +44,7 @@ class Purchase(Base):
     )
     comment = Column(Text, comment='Комментарий к покупке')
 
-    # ----- Связи ----- #
+    #  ----- Связи -----
     product = relationship(
         'Product',
         back_populates='purchases'

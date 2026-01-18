@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import argparse
 
-from app.models import Category
-from app.crud.categories import crud as category_crud
+from app.models import Unit
+from app.crud.units import crud as unit_crud
 from app.cli.common import print_item, print_list_items, session_scope
 
 
-def register_category_commands(
+def register_unit_commands(
     subparsers: argparse._SubParsersAction
 ) -> None:
     pars = subparsers.add_parser(
-        'category',
-        help='Управление категориями покупок.',
+        'units',
+        help='Управление единицами измерения (Е.И.) покупок.',
     )
     subpars = pars.add_subparsers(
         dest='action',
@@ -21,18 +21,18 @@ def register_category_commands(
 
     add = subpars.add_parser(
         'add',
-        help='Добавить категорию.',
+        help='Добавить единицу измерений.',
     )
-    add.add_argument('name', help='Название категории.')
+    add.add_argument('unit', help='Единица измерения.')
     add.add_argument(
-        '-d',
-        '--description',
+        '-mt',
+        '--measure-type',
         default=None,
-        help='Описание категории.',
+        help='Тип единицы измерения (Вес, Объем и т.д.). ',
     )
     add.set_defaults(func=cmd_add)
 
-    lst = subpars.add_parser('list', help='Список категорий')
+    lst = subpars.add_parser('list', help='Список единиц измерений')
     lst.add_argument(
         '-o',
         '--offset',
@@ -53,32 +53,32 @@ def register_category_commands(
     )
     lst.set_defaults(func=cmd_list)
 
-    get = subpars.add_parser('get', help='Получить категорию по id')
+    get = subpars.add_parser('get', help='Получить ед. изм. по id')
     get.add_argument('id', type=int)
     get.set_defaults(func=cmd_get)
 
-    upd = subpars.add_parser('update', help='Обновить категорию')
+    upd = subpars.add_parser('update', help='Обновить ед. изм.')
     upd.add_argument('id', type=int)
-    upd.add_argument('--name', default=None)
-    upd.add_argument('--description', default=None)
+    upd.add_argument('--unit', default=None)
+    upd.add_argument('--measure-type', default=None)
     upd.set_defaults(func=cmd_update)
 
-    rm = subpars.add_parser('delete', help='Удалить категорию')
+    rm = subpars.add_parser('delete', help='Удалить ед. изм.')
     rm.add_argument('id', type=int)
     rm.set_defaults(func=cmd_delete)
 
 
 def cmd_add(args: argparse.Namespace) -> None:
     with session_scope() as db:
-        obj = Category(name=args.name, description=args.description)
-        obj = category_crud.create(db=db, obj_in=obj, commit=True)
+        obj = Unit(unit=args.unit, measure_type=args.measure_type)
+        obj = unit_crud.create(db=db, obj_in=obj, commit=True)
         print_item(obj)
 
 
 def cmd_list(args: argparse.Namespace) -> None:
     with session_scope() as db:
-        order_col = Category.id if args.order == 'id' else Category.name
-        items = category_crud.list(
+        order_col = Unit.id if args.order == 'id' else Unit.name
+        items = unit_crud.list(
             db=db,
             offset=args.offset,
             limit=args.limit,
@@ -89,13 +89,13 @@ def cmd_list(args: argparse.Namespace) -> None:
 
 def cmd_get(args: argparse.Namespace) -> None:
     with session_scope() as db:
-        obj = category_crud.get_or_raise(db=db, obj_id=args.id)
+        obj = unit_crud.get_or_raise(db=db, obj_id=args.id)
         print_item(obj)
 
 
 def cmd_update(args: argparse.Namespace) -> None:
     with session_scope() as db:
-        obj = category_crud.update(
+        obj = unit_crud.update(
             db=db,
             obj_id=args.id,
             commit=True,
@@ -107,5 +107,5 @@ def cmd_update(args: argparse.Namespace) -> None:
 
 def cmd_delete(args: argparse.Namespace) -> None:
     with session_scope() as db:
-        category_crud.delete(db=db, obj_id=args.id, commit=True)
+        unit_crud.delete(db=db, obj_id=args.id, commit=True)
         print(f'OK deleted id={args.id}')
