@@ -36,18 +36,20 @@ def register_unit_commands(
     lst.add_argument(
         '-o',
         '--offset',
+        type=int,
         default=0,
         help='Смещение для пагинации (по умолчанию 0).',
     )
     lst.add_argument(
         '-l',
         '--limit',
+        type=int,
         default=100,
         help='Лимит для пагинации (по умолчанию 100).',
     )
     lst.add_argument(
         '--order',
-        choices=('id', 'name'),
+        choices=('id', 'unit'),
         default='id',
         help='Поле сортировки.',
     )
@@ -77,7 +79,7 @@ def cmd_add(args: argparse.Namespace) -> None:
 
 def cmd_list(args: argparse.Namespace) -> None:
     with session_scope() as db:
-        order_col = Unit.id if args.order == 'id' else Unit.name
+        order_col = Unit.id if args.order == 'id' else Unit.unit
         items = unit_crud.list(
             db=db,
             offset=args.offset,
@@ -99,8 +101,8 @@ def cmd_update(args: argparse.Namespace) -> None:
             db=db,
             obj_id=args.id,
             commit=True,
-            name=args.name,
-            description=args.description,
+            unit=args.unit,
+            measure_type=args.measure_type,
         )
         print_item(obj)
 

@@ -23,7 +23,7 @@ class Category(Base):
     )
 
     def __repr__(self) -> str:
-        return f'<Category id={self.id} name={self.name!r}>'
+        return self.name
 
     def to_dict(self) -> dict:
         return {

@@ -19,7 +19,7 @@ class Store(Base):
     )
 
     def __repr__(self) -> str:
-        return f'<Store id={self.id} name={self.name!r}>'
+        return self.name
 
     def to_dict(self) -> dict:
         return {

@@ -39,7 +39,9 @@ def create_purchase(
             purchase_date=purchase_date or date.today(),
             comment=comment,
         )
-        purchase = crud.create(db=session, obj_in=purchase, commit=True)
+        purchase = crud.create(db=session, obj_in=purchase, commit=False)
+        session.commit()
+        session.refresh(purchase)
         return purchase
 
 

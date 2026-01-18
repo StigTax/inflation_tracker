@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 
 from app.cli.common import configure_db
-from app.cli import categories, stores, units
+from app.cli import categories, stores, units, products, purchases
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -29,8 +29,8 @@ def build_parser() -> argparse.ArgumentParser:
     categories.register_category_commands(subparsers)
     stores.register_store_commands(subparsers)
     units.register_unit_commands(subparsers)
-    # products.register(subparsers)
-    # purchases.register(subparsers)
+    products.register_product_commands(subparsers)
+    purchases.register_purchase_commands(subparsers)
 
     return parser
 

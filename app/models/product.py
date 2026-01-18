@@ -38,7 +38,7 @@ class Product(Base):
     )
 
     def __repr__(self) -> str:
-        return f'<Product id={self.id} name={self.name!r}>'
+        return self.name
 
     def to_dict(self) -> dict:
         return {
@@ -68,7 +68,7 @@ class Unit(Base):
     )
 
     def __repr__(self) -> str:
-        return f'<Unit id={self.id} unit={self.unit!r}>'
+        return self.unit
 
     def to_dict(self) -> dict:
         return {

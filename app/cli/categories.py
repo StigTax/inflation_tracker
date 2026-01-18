@@ -36,12 +36,14 @@ def register_category_commands(
     lst.add_argument(
         '-o',
         '--offset',
+        type=int,
         default=0,
         help='Смещение для пагинации (по умолчанию 0).',
     )
     lst.add_argument(
         '-l',
         '--limit',
+        type=int,
         default=100,
         help='Лимит для пагинации (по умолчанию 100).',
     )

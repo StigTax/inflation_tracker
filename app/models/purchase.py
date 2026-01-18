@@ -53,3 +53,16 @@ class Purchase(Base):
         'Store',
         back_populates='purchases'
     )
+
+    def to_dict(self) -> dict:
+        data = {
+            "id": self.id,
+            "purchase_date": str(self.purchase_date),
+            "product": self.product.name,
+            "store": self.store.name,
+            "quantity": self.quantity,
+            "total_price": self.total_price,
+            "unit_ptice": self.unit_price,
+            "comment": self.comment,
+        }
+        return data
