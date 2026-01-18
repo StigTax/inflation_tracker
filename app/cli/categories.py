@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import argparse
 
-from app.models import Category
-from app.crud.categories import crud as category_crud
 from app.cli.common import print_item, print_list_items, session_scope
+from app.crud.categories import crud as category_crud
+from app.models import Category
 
 
 def register_category_commands(
-    subparsers: argparse._SubParsersAction
+    subparsers: argparse._SubParsersAction,
 ) -> None:
     pars = subparsers.add_parser(
         'category',

@@ -1,5 +1,6 @@
-import pytest
 from datetime import date
+
+import pytest
 
 from app.service import purchases
 
@@ -112,7 +113,7 @@ def test_update_purchase_date_in_future_raises_error(
     purchase_product,
 ):
     future_date = purchase_product.purchase_date.replace(
-        year=purchase_product.purchase_date.year + 2
+        year=purchase_product.purchase_date.year + 2,
     )
 
     with pytest.raises(ValueError) as exc_info:

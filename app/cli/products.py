@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import argparse
 
-from app.cli.common import (
-    print_item, print_list_items, session_scope, parse_date
-)
+from app.cli.common import print_item, print_list_items, session_scope
 from app.crud.products import crud as product_crud
 from app.models import Product
 

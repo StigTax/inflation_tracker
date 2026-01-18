@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import (
-    Column, Integer, Date,
-    ForeignKey, Float, Text
-)
+from sqlalchemy import Column, Date, Float, ForeignKey, Integer, Text
 from sqlalchemy.orm import relationship
 
 from app.core.db import Base
@@ -43,18 +40,18 @@ class Purchase(Base):
     unit_price = Column(
         Float,
         nullable=False,
-        comment='Цена за единицу товара'
+        comment='Цена за единицу товара',
     )
     comment = Column(Text, comment='Комментарий к покупке')
 
     #  ----- Связи -----
     product = relationship(
         'Product',
-        back_populates='purchases'
+        back_populates='purchases',
     )
     store = relationship(
         'Store',
-        back_populates='purchases'
+        back_populates='purchases',
     )
 
     def to_dict(self) -> dict:

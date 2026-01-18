@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from app.core.db import get_session
-from app.models import Product
 from app.crud.products import crud as product_crud
+from app.models import Product
 
 
 def get_product(

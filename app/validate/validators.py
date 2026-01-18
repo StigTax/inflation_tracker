@@ -1,5 +1,5 @@
-from typing import Optional
 from datetime import date as dt_date
+from typing import Optional
 
 
 def ensure_item_exists(
@@ -10,7 +10,7 @@ def ensure_item_exists(
     """Проверяет, что объект найден."""
     if item is None:
         raise ValueError(
-            f'{item_name} с ID {item_id} не найден.'
+            f'{item_name} с ID {item_id} не найден.',
         )
 
 
@@ -32,6 +32,6 @@ def validate_positive_value(
 ) -> None:
     if value <= 0:
         raise ValueError(
-            f'{field_name} не может быть меньше или равной нулю.'
+            f'{field_name} не может быть меньше или равной нулю.',
         )
     return value

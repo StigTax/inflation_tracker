@@ -1,5 +1,6 @@
-from pathlib import Path
 from datetime import date
+from pathlib import Path
+
 
 BASE_DIR = Path(__file__).parent.parent
 LOG_DIR = BASE_DIR / 'logs'

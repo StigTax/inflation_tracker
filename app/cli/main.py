@@ -1,27 +1,28 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
+from app.cli import categories, products, purchases, stores, units
 from app.cli.common import configure_db
-from app.cli import categories, stores, units, products, purchases
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog='inflation',
-        description='CLI для трекера инфляции',
+        description='CLI для тестирования CRUD слоёв проекта.',
     )
     parser.add_argument(
         '--db-url',
         dest='db_url',
         default=None,
-        help='DB URL (или env DB_URL)'
+        help='DB URL (или env DB_URL)',
     )
     parser.add_argument(
         '--echo-sql',
         dest='echo_sql',
         action='store_true',
-        help='Печатать SQL'
+        help='Печатать SQL',
     )
 
     subparsers = parser.add_subparsers(dest='entity')
@@ -38,19 +39,13 @@ def build_parser() -> argparse.ArgumentParser:
 def main():
     parser = build_parser()
     args = parser.parse_args()
-    if not getattr(args, 'entity', None):
-        parser.print_help()
-        return
+    configure_db(db_url=args.db_url, echo_sql=args.echo_sql)
 
-    configure_db(
-        getattr(
-            args,
-            'db_url',
-            None
-        ), echo_sql=getattr(args, 'echo_sql', False)
-    )
-
-    args.func(args)
+    try:
+        args.func(args)
+    except Exception as e:
+        print(f'ERROR: {e}', file=sys.stderr)
+        raise SystemExit(1)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
-from app.models import Unit
 from app.crud.base import CRUDBase
+from app.models import Unit
 
 
 class UnitCRUD(CRUDBase[Unit]):

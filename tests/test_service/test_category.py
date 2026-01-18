@@ -18,7 +18,7 @@ def test_update_category(category_food):
     updated_category = categories.update_category(
         category_food.id,
         name='Фрукты',
-        description='Свежие фрукты'
+        description='Свежие фрукты',
     )
     assert updated_category.id == category_food.id
     assert updated_category.name == 'Фрукты'
@@ -27,7 +27,7 @@ def test_update_category(category_food):
 
 def test_get_category_by_id(category_food):
     fetched_category = categories.get_category(
-        category_food.id
+        category_food.id,
     )
     assert fetched_category is not None
     assert fetched_category.id == category_food.id

@@ -35,7 +35,7 @@ def test_update_store(single_store):
     updated_store = stores.update_store(
         single_store.id,
         name='Магнит Экспресс',
-        description='Магнит Экспресс - магазин для занятых людей'
+        description='Магнит Экспресс - магазин для занятых людей',
     )
     assert updated_store.id == single_store.id
     assert updated_store.name == 'Магнит Экспресс'

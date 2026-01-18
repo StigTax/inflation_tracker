@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Optional, Any
+from typing import Any, Optional
 
 from app.core.db import get_session
-from app.models import Unit
 from app.crud.units import crud as unit_crud
+from app.models import Unit
 
 
 def get_unit(

@@ -1,5 +1,5 @@
-from app.models import Category
 from app.crud.base import CRUDBase
+from app.models import Category
 
 
 class CategoryCRUD(CRUDBase[Category]):

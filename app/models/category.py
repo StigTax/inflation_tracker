@@ -13,13 +13,13 @@ class Category(Base):
     )
     description = Column(
         Text,
-        comment='Описание категории'
+        comment='Описание категории',
     )
 
     #  ----- Связи -----
     products = relationship(
         'Product',
-        back_populates='category'
+        back_populates='category',
     )
 
     def __repr__(self) -> str:
@@ -29,5 +29,5 @@ class Category(Base):
         return {
             "id": self.id,
             "name": self.name,
-            "description": self.description
+            "description": self.description,
         }

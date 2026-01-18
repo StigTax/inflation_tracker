@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Generic, Optional, Type, TypeVar
 from datetime import datetime
+from typing import Any, Generic, Optional, Type, TypeVar
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.validate.validators import ensure_item_exists
+
 
 ModelT = TypeVar('ModelT')
 
@@ -25,7 +26,7 @@ class CRUDBase(Generic[ModelT]):
     ) -> ModelT:
         """Получение объекта по ID с проверкой существования."""
         obj = select(
-            self.model
+            self.model,
         ).where(self.model.id == obj_id)
         obj = db.scalars(obj).first()
         ensure_item_exists(obj, self.model.__name__, obj_id)
@@ -41,7 +42,7 @@ class CRUDBase(Generic[ModelT]):
     ) -> list[ModelT]:
         """Получение списка объектов с пагинацией и сортировкой."""
         stmt = select(
-            self.model
+            self.model,
         ).offset(offset).limit(limit)
         if order_by is not None:
             stmt = stmt.order_by(order_by)

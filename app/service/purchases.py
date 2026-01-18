@@ -6,7 +6,10 @@ from typing import Optional
 from app.core.db import get_session
 from app.crud.purchases import crud as purchase_crud
 from app.models import Purchase
-from app.validate.validators import validate_date_not_in_future, validate_positive_value
+from app.validate.validators import (
+    validate_date_not_in_future,
+    validate_positive_value,
+)
 
 
 def create_purchase(
@@ -34,8 +37,11 @@ def create_purchase(
             purchase_date=purchase_date,
             comment=comment,
         )
-        # ВАЖНО: commit=True, иначе id останется None
-        return purchase_crud.create(db=db, obj_in=purchase, commit=True)
+        created = purchase_crud.create(db=db, obj_in=purchase, commit=True)
+        return purchase_crud.get_with_normal_attr_or_raise(
+            db=db,
+            obj_id=created.id,
+        )
 
 
 def update_purchase(
@@ -77,13 +83,19 @@ def update_purchase(
 
         db.commit()
         db.refresh(purchase)
-        return purchase
+        return purchase_crud.get_with_normal_attr_or_raise(
+            db=db,
+            obj_id=purchase.id,
+        )
 
 
 def get_purchase_by_id(purchase_id: int) -> Purchase:
     with get_session() as db:
         # ключевое: строго keyword-аргументы, db должен быть Session
-        return purchase_crud.get_with_normal_attr_or_raise(db=db, obj_id=purchase_id)
+        return purchase_crud.get_with_normal_attr_or_raise(
+            db=db,
+            obj_id=purchase_id
+        )
 
 
 def get_purchase_by_product(

@@ -1,10 +1,10 @@
-import os
 from contextlib import contextmanager
-import re
 from datetime import datetime
+import os
+import re
 
-from sqlalchemy import Column, Integer, DateTime, create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base, declared_attr
+from sqlalchemy import Column, DateTime, Integer, create_engine
+from sqlalchemy.orm import declarative_base, declared_attr, sessionmaker
 
 
 DB_URL = os.getenv('DB_URL', 'sqlite:///./test.db')
@@ -24,7 +24,7 @@ class PreBase:
     to_create = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow
+        default=datetime.utcnow,
     )
     to_update = Column(DateTime, nullable=True)
 
@@ -50,7 +50,7 @@ def init_db(db_url: str, echo: bool = False):
     _SessionLocal = sessionmaker(
         bind=_engine,
         autoflush=False,
-        expire_on_commit=False
+        expire_on_commit=False,
     )
 
 

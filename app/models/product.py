@@ -1,9 +1,10 @@
 from __future__ import annotations
+
 from sqlalchemy import (
     Column,
+    ForeignKey,
     Integer,
     String,
-    ForeignKey,
 )
 from sqlalchemy.orm import relationship
 
@@ -30,7 +31,7 @@ class Product(Base):
     #  ----- Связи -----
     category = relationship(
         'Category',
-        back_populates='products'
+        back_populates='products',
     )
     purchases = relationship(
         'Purchase',
@@ -81,5 +82,5 @@ class Unit(Base):
         return {
             "id": self.id,
             "unit": self.unit,
-            "measure_type": self.measure_type
+            "measure_type": self.measure_type,
         }

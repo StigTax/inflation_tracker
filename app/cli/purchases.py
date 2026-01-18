@@ -2,10 +2,21 @@ from __future__ import annotations
 
 import argparse
 
-from app.cli.common import parse_date, print_item, print_list_items, session_scope
+from app.cli.common import (
+    add_list_args,
+    parse_date,
+    print_item,
+    print_list_items,
+    session_scope,
+)
 from app.crud.purchases import crud as purchase_crud
 from app.models import Purchase
-from app.service.purchases import create_purchase, update_purchase
+from app.service.purchases import (
+    create_purchase,
+    get_purchase_by_product,
+    get_purchase_by_store,
+    update_purchase,
+)
 
 
 ORDER_MAP = {
@@ -17,7 +28,11 @@ ORDER_MAP = {
 }
 
 
-def add_purchase_fields(parser: argparse.ArgumentParser, *, required: bool) -> None:
+def add_purchase_fields(
+    parser: argparse.ArgumentParser,
+    *,
+    required: bool,
+) -> None:
     """Поля для add/update.
 
     Для add: required=True, для update: required=False.
@@ -79,15 +94,16 @@ def register_purchase_commands(subparsers: argparse._SubParsersAction) -> None:
     add.set_defaults(func=cmd_add)
 
     lst = subpars.add_parser('list', help='Список покупок')
-    lst.add_argument('-o', '--offset', type=int, default=0,
-                     help='Смещение для пагинации (по умолчанию 0).')
-    lst.add_argument('-l', '--limit', type=int, default=100,
-                     help='Лимит для пагинации (по умолчанию 100).')
-    lst.add_argument('--order',
-                     choices=('id', 'product', 'purchase_date',
-                              'store', 'quantity'),
-                     default='id',
-                     help='Поле сортировки.')
+    add_list_args(lst, order_choices=('id', 'product', 'purchase_date',
+                  'store', 'quantity'), default_order='purchase_date')
+    lst.add_argument('--product-id', type=int, default=None,
+                     help='Фильтр по продукту (ID)')
+    lst.add_argument('--store-id', type=int, default=None,
+                     help='Фильтр по магазину (ID)')
+    lst.add_argument('--from-date', type=parse_date,
+                     default=None, help='Дата начала (YYYY-MM-DD)')
+    lst.add_argument('--to-date', type=parse_date,
+                     default=None, help='Дата конца (YYYY-MM-DD)')
     lst.set_defaults(func=cmd_list)
 
     get = subpars.add_parser('get', help='Получить покупку по id')
@@ -125,6 +141,20 @@ def cmd_add(args: argparse.Namespace) -> None:
 
 
 def cmd_list(args: argparse.Namespace) -> None:
+    if args.product_id is not None:
+        items = get_purchase_by_product(
+            product_id=args.product_id,
+            from_date=args.from_date,
+            to_date=args.to_date,
+        )
+        print_list_items(items)
+        return
+
+    if args.store_id is not None:
+        items = get_purchase_by_store(args.store_id)
+        print_list_items(items)
+        return
+
     with session_scope() as db:
         order_col = ORDER_MAP[args.order]
         items = purchase_crud.list(

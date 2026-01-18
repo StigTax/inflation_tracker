@@ -1,6 +1,6 @@
-import os
 from contextlib import contextmanager
 from datetime import date
+import os
 
 import pytest
 from sqlalchemy import create_engine
@@ -9,7 +9,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.db import Base
 from app.models import Category, Product, Store, Unit
-from app.service import categories, purchases, products, stores, units
+from app.service import categories, products, purchases, stores, units
+
 
 DB_URL = os.getenv('TEST_DATABASE_URL', 'sqlite+pysqlite:///:memory:')
 
@@ -83,7 +84,7 @@ def few_categories():
             Category(
                 name='Молочные продукты',
                 description='Свежие молочные продукты',
-            )
+            ),
         ),
         categories.create_category(Category(name='Хлебобулочные изделия')),
     ]

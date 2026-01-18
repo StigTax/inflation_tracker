@@ -1,5 +1,5 @@
-from app.models import Product
 from app.crud.base import CRUDBase
+from app.models import Product
 
 
 class ProductCRUD(CRUDBase[Product]):

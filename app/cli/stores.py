@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import argparse
 
-from app.models import Store
-from app.crud.stores import crud as store_crud
 from app.cli.common import print_item, print_list_items, session_scope
+from app.crud.stores import crud as store_crud
+from app.models import Store
 
 
 def register_store_commands(
-    subparsers: argparse._SubParsersAction
+    subparsers: argparse._SubParsersAction,
 ) -> None:
     pars = subparsers.add_parser(
         'store',
