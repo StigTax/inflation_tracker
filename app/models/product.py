@@ -17,22 +17,22 @@ class Product(Base):
         Integer,
         ForeignKey('category.id')
     )
+    unit_id = Column(
+        Integer,
+        ForeignKey('unit.id')
+    )
+
+    #  ----- Связи -----
     category = relationship(
         'Category',
         back_populates='products'
     )
-    measure_type = Column(
-        String(25),
-        nullable=False,
-        comment='Тип единицы измерения',
-    )
-    unit = Column(
-        String(25),
-        nullable=False,
-        comment='Единица измерения',
-    )
     purchases = relationship(
         'Purchase',
+        back_populates='product',
+    )
+    units = relationship(
+        'Unit',
         back_populates='product',
     )
 
@@ -46,4 +46,27 @@ class Product(Base):
             "category": self.category,
             "measure_type": self.measure_type,
             "unit": self.unit
+        }
+
+
+class Unit(Base):
+    measure_type = Column(
+        String(25),
+        nullable=False,
+        comment='Тип единицы измерения',
+    )
+    unit = Column(
+        String(25),
+        nullable=False,
+        comment='Единица измерения',
+    )
+
+    def __repr__(self) -> str:
+        return f'<Unit id={self.id} name={self.name!r}>'
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "unit": self.unit,
+            "measure_type": self.measure_type
         }
