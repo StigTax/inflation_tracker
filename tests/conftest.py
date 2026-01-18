@@ -143,11 +143,23 @@ def product_no_category(unit_l):
 def few_products(category_food, unit_kg):
     return [
         products.create_product(
-            Product(name='Помидоры', category_id=category_food.id, unit_id=unit_kg.id)),
+            Product(
+                name='Помидоры',
+                category_id=category_food.id,
+                unit_id=unit_kg.id,
+            )),
         products.create_product(
-            Product(name='Морковь', category_id=category_food.id, unit_id=unit_kg.id)),
+            Product(
+                name='Морковь',
+                category_id=category_food.id,
+                unit_id=unit_kg.id,
+            )),
         products.create_product(
-            Product(name='Капуста', category_id=category_food.id, unit_id=unit_kg.id)),
+            Product(
+                name='Капуста',
+                category_id=category_food.id,
+                unit_id=unit_kg.id,
+            )),
     ]
 
 

@@ -55,11 +55,20 @@ class Purchase(Base):
     )
 
     def to_dict(self) -> dict:
+        product = self.product
+        unit = getattr(product, 'unit', None)
+        category = getattr(product, 'category', None)
+
         return {
             'id': self.id,
             'purchase_date': self.purchase_date,
             'product_id': self.product_id,
-            'product': getattr(self.product, 'name', None),
+            'product': getattr(product, 'name', None),
+
+            'category': getattr(category, 'name', None),
+            'measure_type': getattr(unit, 'measure_type', None),
+            'unit': getattr(unit, 'unit', None),
+
             'store_id': self.store_id,
             'store': getattr(self.store, 'name', None),
             'quantity': self.quantity,

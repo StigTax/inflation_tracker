@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import argparse
 
-from app.cli.common import print_item, print_list_items, session_scope
+from app.cli.common import (
+    add_list_args,
+    print_item,
+    print_list_items,
+    print_list_verbose,
+    print_table,
+    session_scope,
+)
 from app.crud.products import crud as product_crud
 from app.models import Product
 
@@ -33,12 +40,15 @@ def register_product_commands(subparsers: argparse._SubParsersAction) -> None:
     add.set_defaults(func=cmd_add)
 
     lst = subpars.add_parser('list', help='Список продуктов')
-    lst.add_argument('-o', '--offset', type=int, default=0,
-                     help='Смещение для пагинации (по умолчанию 0).')
-    lst.add_argument('-l', '--limit', type=int, default=100,
-                     help='Лимит для пагинации (по умолчанию 100).')
-    lst.add_argument('--order', choices=('id', 'name'), default='id',
-                     help='Поле сортировки.')
+    grp = lst.add_mutually_exclusive_group()
+    grp.add_argument('--full', action='store_true',
+                     help='key: value для каждого объекта')
+    grp.add_argument('--table', action='store_true', help='табличный вывод')
+    add_list_args(
+        lst,
+        order_choices=('id', 'name'),
+        default_order='id',
+    )
     lst.set_defaults(func=cmd_list)
 
     get = subpars.add_parser('get', help='Получить продукт по id')
@@ -72,8 +82,19 @@ def cmd_list(args: argparse.Namespace) -> None:
     with session_scope() as db:
         order_col = Product.id if args.order == 'id' else Product.name
         items = product_crud.list(
-            db=db, offset=args.offset, limit=args.limit, order_by=order_col)
-        print_list_items(items)
+            db=db, offset=args.offset, limit=args.limit, order_by=order_col,
+        )
+
+        if args.table:
+            print_table(
+                items,
+                columns=('id', 'name', 'category', 'measure_type', 'unit'),
+                headers=('ID', 'Название', 'Категория', 'Тип', 'Ед.'),
+            )
+        elif args.full:
+            print_list_verbose(items)
+        else:
+            print_list_items(items)
 
 
 def cmd_get(args: argparse.Namespace) -> None:

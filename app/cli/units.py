@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import argparse
 
-from app.cli.common import print_item, print_list_items, session_scope
+from app.cli.common import (
+    add_list_args,
+    print_item,
+    print_list_items,
+    print_list_verbose,
+    session_scope,
+    print_table
+)
 from app.crud.units import crud as unit_crud
 from app.models import Unit
 
@@ -25,12 +32,22 @@ def register_unit_commands(subparsers: argparse._SubParsersAction) -> None:
     add.set_defaults(func=cmd_add)
 
     lst = subpars.add_parser('list', help='Список единиц измерений')
-    lst.add_argument('-o', '--offset', type=int, default=0,
-                     help='Смещение для пагинации (по умолчанию 0).')
-    lst.add_argument('-l', '--limit', type=int, default=100,
-                     help='Лимит для пагинации (по умолчанию 100).')
-    lst.add_argument('--order', choices=('id', 'unit'), default='id',
-                     help='Поле сортировки.')
+    grp = lst.add_mutually_exclusive_group()
+    grp.add_argument(
+        '--full',
+        action='store_true',
+        help='key: value для каждого объекта'
+    )
+    grp.add_argument(
+        '--table',
+        action='store_true',
+        help='табличный вывод'
+    )
+    add_list_args(
+        lst,
+        order_choices=('id', 'unit'),
+        default_order='id',
+    )
     lst.set_defaults(func=cmd_list)
 
     get = subpars.add_parser('get', help='Получить ед. изм. по id')
@@ -60,7 +77,16 @@ def cmd_list(args: argparse.Namespace) -> None:
         order_col = Unit.id if args.order == 'id' else Unit.unit
         items = unit_crud.list(db=db, offset=args.offset,
                                limit=args.limit, order_by=order_col)
-        print_list_items(items)
+        if args.table:
+            print_table(
+                items,
+                columns=('id', 'measure_type', 'unit'),
+                headers=('ID', 'Тип', 'Ед.'),
+            )
+        elif args.full:
+            print_list_verbose(items)
+        else:
+            print_list_items(items)
 
 
 def cmd_get(args: argparse.Namespace) -> None:

@@ -7,6 +7,8 @@ from app.cli.common import (
     parse_date,
     print_item,
     print_list_items,
+    print_list_verbose,
+    print_table,
     session_scope,
 )
 from app.crud.purchases import crud as purchase_crud
@@ -94,6 +96,10 @@ def register_purchase_commands(subparsers: argparse._SubParsersAction) -> None:
     add.set_defaults(func=cmd_add)
 
     lst = subpars.add_parser('list', help='Список покупок')
+    grp = lst.add_mutually_exclusive_group()
+    grp.add_argument('--full', action='store_true',
+                     help='key: value для каждого объекта')
+    grp.add_argument('--table', action='store_true', help='табличный вывод')
     add_list_args(lst, order_choices=('id', 'product', 'purchase_date',
                   'store', 'quantity'), default_order='purchase_date')
     lst.add_argument('--product-id', type=int, default=None,
@@ -126,6 +132,41 @@ def register_purchase_commands(subparsers: argparse._SubParsersAction) -> None:
     rm.set_defaults(func=cmd_delete)
 
 
+def _print_purchases(items: list[Purchase], args: argparse.Namespace) -> None:
+    if args.table:
+        print_table(
+            items,
+            columns=(
+                'id',
+                'purchase_date',
+                'product',
+                'category',
+                'quantity',
+                'unit',
+                'measure_type',
+                'total_price',
+                'unit_price',
+                'store',
+            ),
+            headers=(
+                'ID',
+                'Дата',
+                'Товар',
+                'категория',
+                'Кол-во',
+                'Ед. Изм.',
+                'Вид Ед. Изм.',
+                'Сумма',
+                'Цена/ед',
+                'Магазин',
+            ),
+        )
+    elif args.full:
+        print_list_verbose(items)
+    else:
+        print_list_items(items)
+
+
 def cmd_add(args: argparse.Namespace) -> None:
     obj = create_purchase(
         store_id=args.store_id,
@@ -147,19 +188,23 @@ def cmd_list(args: argparse.Namespace) -> None:
             from_date=args.from_date,
             to_date=args.to_date,
         )
-        print_list_items(items)
+        _print_purchases(items, args)
         return
 
     if args.store_id is not None:
         items = get_purchase_by_store(args.store_id)
-        print_list_items(items)
+        _print_purchases(items, args)
         return
 
     with session_scope() as db:
         order_col = ORDER_MAP[args.order]
         items = purchase_crud.list(
-            db=db, offset=args.offset, limit=args.limit, order_by=order_col)
-        print_list_items(items)
+            db=db,
+            offset=args.offset,
+            limit=args.limit,
+            order_by=order_col,
+        )
+        _print_purchases(items, args)
 
 
 def cmd_get(args: argparse.Namespace) -> None:

@@ -4,11 +4,39 @@ import argparse
 from contextlib import contextmanager
 from datetime import date
 import os
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
+from prettytable import PrettyTable
 from sqlalchemy.exc import IntegrityError
 
 from app.core.db import get_session, init_db
+
+
+def print_table(
+    objs: Sequence[Any],
+    columns: Sequence[str] | None = None,
+    headers: Sequence[str] | None = None,
+) -> None:
+    if not objs:
+        print('(пусто)')
+        return
+
+    first = objs[0].to_dict()
+    if columns is None:
+        columns = list(first.keys())
+
+    if headers is None:
+        headers = list(columns)
+
+    t = PrettyTable(headers)
+    t.align = 'l'
+
+    for obj in objs:
+        data = obj.to_dict()
+        row = [data.get(col) for col in columns]
+        t.add_row(row)
+
+    print(t)
 
 
 def configure_db(
@@ -46,6 +74,13 @@ def print_list_items(objs: list[Any]) -> None:
             print(f'{data["id"]}\t{data["name"]}')
         else:
             print(data)
+
+
+def print_list_verbose(objs: list[Any]) -> None:
+    for idx, obj in enumerate(objs):
+        if idx:
+            print('-' * 40)
+        print_item(obj)
 
 
 def add_list_args(
