@@ -1,9 +1,7 @@
 from datetime import date
 
 import pytest
-
-from app.crud.categories import crud
-from app.service import purchases, crud_service
+from app.service import purchases
 
 
 def test_create_purchase(purchase_product, few_stores, product_vegetable):
@@ -43,7 +41,7 @@ def test_get_purchase_by_id(purchase_product):
 
 
 def test_get_list_purchase(few_purchase_in_few_stores, purchase_product):
-    purchase_list = purchases.get_list_purchase()
+    purchase_list = purchases.list_purchases()
 
     assert len(purchase_list) == 4
     purchase_ids = {p.id for p in purchase_list}

@@ -10,23 +10,17 @@ from app.cli.common import (
     print_list_verbose,
     print_table,
 )
-from app.core.db import session_scope
-from app.crud.purchases import crud as purchase_crud
+from app.core.constants import ORDER_MAP
 from app.models import Purchase
 from app.service.purchases import (
     create_purchase,
+    delete_purchase,
+    get_purchase_by_id,
     get_purchase_by_product,
     get_purchase_by_store,
+    list_purchases,
     update_purchase,
 )
-
-ORDER_MAP = {
-    'id': Purchase.id,
-    'product': Purchase.product_id,
-    'purchase_date': Purchase.purchase_date,
-    'store': Purchase.store_id,
-    'quantity': Purchase.quantity,
-}
 
 
 def add_purchase_fields(
@@ -175,9 +169,8 @@ def cmd_add(args: argparse.Namespace) -> None:
         purchase_date=args.date,
         comment=args.comment,
     )
-    with session_scope() as db:
-        obj = purchase_crud.get_with_normal_attr_or_raise(db=db, obj_id=obj.id)
-        print_item(obj)
+    obj = get_purchase_by_id(purchase_id=obj.id)
+    print_item(obj)
 
 
 def cmd_list(args: argparse.Namespace) -> None:
@@ -195,22 +188,18 @@ def cmd_list(args: argparse.Namespace) -> None:
         _print_purchases(items, args)
         return
 
-    with session_scope() as db:
-        order_col = ORDER_MAP[args.order]
-        items = purchase_crud.list(
-            db=db,
-            offset=args.offset,
-            limit=args.limit,
-            order_by=order_col,
-        )
-        _print_purchases(items, args)
+    order_col = ORDER_MAP[args.order]
+    items = list_purchases(
+        offset=args.offset,
+        limit=args.limit,
+        order_by=order_col,
+    )
+    _print_purchases(items, args)
 
 
 def cmd_get(args: argparse.Namespace) -> None:
-    with session_scope() as db:
-        obj = purchase_crud.get_with_normal_attr_or_raise(
-            db=db, obj_id=args.id)
-        print_item(obj)
+    obj = get_purchase_by_id(purchase_id=args.id)
+    print_item(obj)
 
 
 def cmd_update(args: argparse.Namespace) -> None:
@@ -223,12 +212,10 @@ def cmd_update(args: argparse.Namespace) -> None:
         comment=args.comment,
         purchase_date=args.date,
     )
-    with session_scope() as db:
-        obj = purchase_crud.get_with_normal_attr_or_raise(db=db, obj_id=obj.id)
-        print_item(obj)
+    obj = get_purchase_by_id(purchase_id=obj.id)
+    print_item(obj)
 
 
 def cmd_delete(args: argparse.Namespace) -> None:
-    with session_scope() as db:
-        purchase_crud.delete(db=db, obj_id=args.id, commit=True)
-        print(f'OK deleted id={args.id}')
+    delete_purchase(purchase_id=args.id, commit=True)
+    print(f'OK deleted id={args.id}')

@@ -9,9 +9,15 @@ from app.cli.common import (
     print_list_verbose,
     print_table,
 )
-from app.core.db import session_scope
-from app.crud.products import crud as product_crud
+from app.crud import product_crud
 from app.models import Product
+from app.service.crud_service import (
+    create_item,
+    delete_item,
+    list_items,
+    update_item,
+)
+from app.service.product import get_product
 
 
 def register_product_commands(subparsers: argparse._SubParsersAction) -> None:
@@ -68,55 +74,53 @@ def register_product_commands(subparsers: argparse._SubParsersAction) -> None:
 
 
 def cmd_add(args: argparse.Namespace) -> None:
-    with session_scope() as db:
-        obj = Product(
-            name=args.name,
-            category_id=args.category_id,
-            unit_id=args.unit_id,
-        )
-        obj = product_crud.create(db=db, obj_in=obj, commit=True)
-        print_item(obj)
+    obj = Product(
+        name=args.name,
+        category_id=args.category_id,
+        unit_id=args.unit_id,
+    )
+    obj = get_product(product_id=args.id)
+    print_item(obj)
 
 
 def cmd_list(args: argparse.Namespace) -> None:
-    with session_scope() as db:
-        order_col = Product.id if args.order == 'id' else Product.name
-        items = product_crud.list(
-            db=db, offset=args.offset, limit=args.limit, order_by=order_col,
-        )
+    order_col = Product.id if args.order == 'id' else Product.name
+    items = list_items(
+        crud=product_crud,
+        offset=args.offset,
+        limit=args.limit,
+        order_by=order_col,
+    )
 
-        if args.table:
-            print_table(
-                items,
-                columns=('id', 'name', 'category', 'measure_type', 'unit'),
-                headers=('ID', 'Название', 'Категория', 'Тип', 'Ед.'),
-            )
-        elif args.full:
-            print_list_verbose(items)
-        else:
-            print_list_items(items)
+    if args.table:
+        print_table(
+            items,
+            columns=('id', 'name', 'category', 'measure_type', 'unit'),
+            headers=('ID', 'Название', 'Категория', 'Тип', 'Ед.'),
+        )
+    elif args.full:
+        print_list_verbose(items)
+    else:
+        print_list_items(items)
 
 
 def cmd_get(args: argparse.Namespace) -> None:
-    with session_scope() as db:
-        obj = product_crud.get_or_raise(db=db, obj_id=args.id)
-        print_item(obj)
+    obj = get_product(product_id=args.id)
+    print_item(obj)
 
 
 def cmd_update(args: argparse.Namespace) -> None:
-    with session_scope() as db:
-        obj = product_crud.update(
-            db=db,
-            obj_id=args.id,
-            commit=True,
-            name=args.name,
-            category_id=args.category_id,
-            unit_id=args.unit_id,
-        )
-        print_item(obj)
+    obj = update_item(
+        crud=product_crud,
+        item_id=args.id,
+        name=args.name,
+        category_id=args.category_id,
+        unit_id=args.unit_id,
+    )
+    obj = get_product(product_id=args.id)
+    print_item(obj)
 
 
 def cmd_delete(args: argparse.Namespace) -> None:
-    with session_scope() as db:
-        product_crud.delete(db=db, obj_id=args.id, commit=True)
-        print(f'OK deleted id={args.id}')
+    delete_item(crud=product_crud, item_id=args.id)
+    print(f'OK deleted id={args.id}')

@@ -11,6 +11,28 @@ from prettytable import PrettyTable
 from app.core.db import init_db
 
 
+def configure_db(
+    db_url: Optional[str] = None,
+    echo_sql: bool = False,
+) -> None:
+    url = db_url or os.getenv(
+        'DB_URL',
+        'sqlite+pysqlite:///./inflation.db',
+    )
+    init_db(url, echo=echo_sql)
+
+
+def parse_date(value: str) -> date:
+    try:
+        value = date.fromisoformat(value)
+    except ValueError:
+        raise ValueError(
+            f'Неверный формат даты: {value}. '
+            'Ожидается формат ГГГГ-ММ-ДД.',
+        )
+    return value
+
+
 def print_table(
     objs: Sequence[Any],
     columns: Sequence[str] | None = None,
@@ -36,28 +58,6 @@ def print_table(
         t.add_row(row)
 
     print(t)
-
-
-def configure_db(
-    db_url: Optional[str] = None,
-    echo_sql: bool = False,
-) -> None:
-    url = db_url or os.getenv(
-        'DB_URL',
-        'sqlite+pysqlite:///./inflation.db',
-    )
-    init_db(url, echo=echo_sql)
-
-
-def parse_date(value: str) -> date:
-    try:
-        value = date.fromisoformat(value)
-    except ValueError:
-        raise ValueError(
-            f'Неверный формат даты: {value}. '
-            'Ожидается формат ГГГГ-ММ-ДД.',
-        )
-    return value
 
 
 def print_item(obj: Any) -> None:
@@ -108,6 +108,3 @@ def add_list_args(
         default=default_order,
         help='Поле сортировки',
     )
-
-
-

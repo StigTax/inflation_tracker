@@ -4,9 +4,9 @@ from datetime import date
 
 import pytest
 from app.core.db import Base
-from app.models import Category, Product, Store, Unit
-from app.service import purchases, crud_service
 from app.crud import category_crud, product_crud, store_crud, unit_crud
+from app.models import Category, Product, Store, Unit
+from app.service import crud_service, purchases
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool

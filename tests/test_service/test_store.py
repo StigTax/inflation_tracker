@@ -1,6 +1,7 @@
 from app.crud.stores import crud
 from app.service import crud_service
 
+
 def test_create_store(single_store):
     assert single_store.id is not None
     assert single_store.name == 'Магнит'

@@ -9,9 +9,15 @@ from app.cli.common import (
     print_list_verbose,
     print_table,
 )
-from app.core.db import session_scope
-from app.crud.categories import crud as category_crud
+from app.crud import category_crud
 from app.models import Category
+from app.service.crud_service import (
+    create_item,
+    delete_item,
+    get_item,
+    list_items,
+    update_item,
+)
 
 
 def register_category_commands(
@@ -67,52 +73,46 @@ def register_category_commands(
 
 
 def cmd_add(args: argparse.Namespace) -> None:
-    with session_scope() as db:
-        obj = Category(name=args.name, description=args.description)
-        obj = category_crud.create(db=db, obj_in=obj, commit=True)
-        print_item(obj)
+    obj = Category(name=args.name, description=args.description)
+    obj = create_item(crud=category_crud, obj_in=obj)
+    print_item(obj)
 
 
 def cmd_list(args: argparse.Namespace) -> None:
-    with session_scope() as db:
-        order_col = Category.id if args.order == 'id' else Category.name
-        items = category_crud.list(
-            db=db,
-            offset=args.offset,
-            limit=args.limit,
-            order_by=order_col,
+    order_col = Category.id if args.order == 'id' else Category.name
+    items = list_items(
+        crud=category_crud,
+        offset=args.offset,
+        limit=args.limit,
+        order_by=order_col,
+    )
+    if args.table:
+        print_table(
+            items,
+            columns=('id', 'name', 'description'),
+            headers=('ID', 'Название', 'Описание'),
         )
-        if args.table:
-            print_table(
-                items,
-                columns=('id', 'name', 'description'),
-                headers=('ID', 'Название', 'Описание'),
-            )
-        elif args.full:
-            print_list_verbose(items)
-        else:
-            print_list_items(items)
+    elif args.full:
+        print_list_verbose(items)
+    else:
+        print_list_items(items)
 
 
 def cmd_get(args: argparse.Namespace) -> None:
-    with session_scope() as db:
-        obj = category_crud.get_or_raise(db=db, obj_id=args.id)
-        print_item(obj)
+    obj = get_item(crud=category_crud, item_id=args.id)
+    print_item(obj)
 
 
 def cmd_update(args: argparse.Namespace) -> None:
-    with session_scope() as db:
-        obj = category_crud.update(
-            db=db,
-            obj_id=args.id,
-            commit=True,
-            name=args.name,
-            description=args.description,
-        )
-        print_item(obj)
+    obj = update_item(
+        crud=category_crud,
+        item_id=args.id,
+        name=args.name,
+        description=args.description,
+    )
+    print_item(obj)
 
 
 def cmd_delete(args: argparse.Namespace) -> None:
-    with session_scope() as db:
-        category_crud.delete(db=db, obj_id=args.id, commit=True)
-        print(f'OK deleted id={args.id}')
+    delete_item(crud=category_crud, item_id=args.id)
+    print(f'OK deleted id={args.id}')

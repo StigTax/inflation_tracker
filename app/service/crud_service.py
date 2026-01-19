@@ -64,7 +64,7 @@ def update_item(
 def delete_item(
     crud,
     item_id: int,
-) -> ModelT:
+) -> None:
     with get_session() as session:
         item = crud.delete(
             db=session,

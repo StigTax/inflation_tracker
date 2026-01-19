@@ -116,11 +116,20 @@ def get_purchase_by_store(store_id: int) -> list[Purchase]:
         return purchase_crud.get_purchase_by_store(db=db, store_id=store_id)
 
 
-def get_list_purchase(offset: int = 0, limit: int = 100) -> list[Purchase]:
+def list_purchases(
+    offset: int = 0,
+    limit: int = 100,
+    order_by=None
+) -> list[Purchase]:
     with get_session() as db:
         return purchase_crud.list(
             db=db,
             offset=offset,
             limit=limit,
-            order_by=Purchase.purchase_date,
+            order_by=order_by
         )
+
+
+def delete_purchase(purchase_id: int) -> None:
+    with get_session() as db:
+        purchase_crud.delete(db=db, obj_id=purchase_id)

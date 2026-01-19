@@ -25,7 +25,9 @@ def build_parser() -> argparse.ArgumentParser:
         help='Печатать SQL',
     )
 
-    subparsers = parser.add_subparsers(dest='entity')
+    subparsers = parser.add_subparsers(
+        dest='entity', required=True
+    )
 
     categories.register_category_commands(subparsers)
     stores.register_store_commands(subparsers)
