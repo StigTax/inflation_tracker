@@ -1,5 +1,5 @@
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.crud.base import CRUDBase
 from app.models import Product
@@ -10,14 +10,17 @@ class ProductCRUD(CRUDBase[Product]):
         self,
         db: Session,
         *,
-        offset=0,
-        limit=100,
+        offset: int = 0,
+        limit: int = 100,
         order_by=None,
     ) -> list[Product]:
-        stmt = select(Purchase)
+        stmt = select(Product).options(
+            selectinload(Product.category),
+            selectinload(Product.unit),
+        )
         if order_by is not None:
             stmt = stmt.order_by(order_by)
-        stmt = self._with_relations(stmt.offset(offset).limit(limit))
+        stmt = stmt.offset(offset).limit(limit)
         return list(db.scalars(stmt).all())
 
 

@@ -8,8 +8,8 @@ from app.cli.common import (
     print_list_items,
     print_list_verbose,
     print_table,
-    session_scope,
 )
+from app.core.db import session_scope
 from app.crud.products import crud as product_crud
 from app.models import Product
 

@@ -7,9 +7,9 @@ from app.cli.common import (
     print_item,
     print_list_items,
     print_list_verbose,
-    session_scope,
-    print_table
+    print_table,
 )
+from app.core.db import session_scope
 from app.crud.units import crud as unit_crud
 from app.models import Unit
 
@@ -36,12 +36,12 @@ def register_unit_commands(subparsers: argparse._SubParsersAction) -> None:
     grp.add_argument(
         '--full',
         action='store_true',
-        help='key: value для каждого объекта'
+        help='key: value для каждого объекта',
     )
     grp.add_argument(
         '--table',
         action='store_true',
-        help='табличный вывод'
+        help='табличный вывод',
     )
     add_list_args(
         lst,

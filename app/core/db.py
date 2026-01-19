@@ -1,11 +1,11 @@
-from contextlib import contextmanager
-from datetime import datetime
 import os
 import re
+from contextlib import contextmanager
+from datetime import datetime
 
 from sqlalchemy import Column, DateTime, Integer, create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import declarative_base, declared_attr, sessionmaker
-
 
 DB_URL = os.getenv('DB_URL', 'sqlite:///./test.db')
 
@@ -64,3 +64,17 @@ def get_session():
         yield session
     finally:
         session.close()
+
+@contextmanager
+def session_scope():
+    with get_session() as session:
+        try:
+            yield session
+        except IntegrityError as e:
+            session.rollback()
+            raise RuntimeError(
+                'Конфликт уникальности / целостности данных',
+            ) from e
+        except Exception:
+            session.rollback()
+            raise

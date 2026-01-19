@@ -1,4 +1,5 @@
-from app.service import categories
+from app.crud.categories import crud
+from app.service import crud_service
 
 
 def test_create_categoty(category_food):
@@ -15,7 +16,8 @@ def test_create_few_categories(few_categories):
 
 
 def test_update_category(category_food):
-    updated_category = categories.update_category(
+    updated_category = crud_service.update_item(
+        crud,
         category_food.id,
         name='Фрукты',
         description='Свежие фрукты',
@@ -26,7 +28,8 @@ def test_update_category(category_food):
 
 
 def test_get_category_by_id(category_food):
-    fetched_category = categories.get_category(
+    fetched_category = crud_service.get_item(
+        crud,
         category_food.id,
     )
     assert fetched_category is not None
@@ -36,7 +39,7 @@ def test_get_category_by_id(category_food):
 
 
 def test_get_list_category(few_categories):
-    category_list = categories.list_categories()
+    category_list = crud_service.list_items(crud)
     assert len(category_list) == len(few_categories)
     category_ids = [category.id for category in category_list]
     for cat in few_categories:

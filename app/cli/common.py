@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
-from datetime import date
 import os
-from typing import Any, Optional, Sequence
+from collections.abc import Sequence
+from datetime import date
+from typing import Any, Optional
 
 from prettytable import PrettyTable
-from sqlalchemy.exc import IntegrityError
 
-from app.core.db import get_session, init_db
+from app.core.db import init_db
 
 
 def print_table(
@@ -89,24 +88,26 @@ def add_list_args(
     order_choices: tuple[str, ...],
     default_order: str = 'id',
 ) -> None:
-    parser.add_argument('-o', '--offset', type=int,
-                        default=0, help='Смещение для пагинации')
-    parser.add_argument('-l', '--limit', type=int,
-                        default=100, help='Лимит для пагинации')
-    parser.add_argument('--order', choices=order_choices,
-                        default=default_order, help='Поле сортировки')
+    parser.add_argument(
+        '-o',
+        '--offset',
+        type=int,
+        default=0,
+        help='Смещение для пагинации',
+    )
+    parser.add_argument(
+        '-l',
+        '--limit',
+        type=int,
+        default=100,
+        help='Лимит для пагинации',
+    )
+    parser.add_argument(
+        '--order',
+        choices=order_choices,
+        default=default_order,
+        help='Поле сортировки',
+    )
 
 
-@contextmanager
-def session_scope():
-    with get_session() as session:
-        try:
-            yield session
-        except IntegrityError as e:
-            session.rollback()
-            raise RuntimeError(
-                'Конфликт уникальности / целостности данных',
-            ) from e
-        except Exception:
-            session.rollback()
-            raise
+

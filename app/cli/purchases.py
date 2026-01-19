@@ -9,8 +9,8 @@ from app.cli.common import (
     print_list_items,
     print_list_verbose,
     print_table,
-    session_scope,
 )
+from app.core.db import session_scope
 from app.crud.purchases import crud as purchase_crud
 from app.models import Purchase
 from app.service.purchases import (
@@ -19,7 +19,6 @@ from app.service.purchases import (
     get_purchase_by_store,
     update_purchase,
 )
-
 
 ORDER_MAP = {
     'id': Purchase.id,

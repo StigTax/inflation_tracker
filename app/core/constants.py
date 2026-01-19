@@ -1,7 +1,6 @@
 from datetime import date
 from pathlib import Path
 
-
 BASE_DIR = Path(__file__).parent.parent
 LOG_DIR = BASE_DIR / 'logs'
 LOG_FILE = LOG_DIR / f'logs_to_{date.today()}.log'

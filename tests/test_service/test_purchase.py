@@ -2,7 +2,8 @@ from datetime import date
 
 import pytest
 
-from app.service import purchases
+from app.crud.categories import crud
+from app.service import purchases, crud_service
 
 
 def test_create_purchase(purchase_product, few_stores, product_vegetable):

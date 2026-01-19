@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from app.validate.validators import ensure_item_exists
 
-
 ModelT = TypeVar('ModelT')
 
 
@@ -78,7 +77,7 @@ class CRUDBase(Generic[ModelT]):
                 setattr(obj, name, value)
 
         if touch_updated_at and hasattr(obj, 'to_update'):
-            setattr(obj, 'to_update', datetime.utcnow())
+            obj.to_update = datetime.utcnow()
 
         if commit:
             db.commit()

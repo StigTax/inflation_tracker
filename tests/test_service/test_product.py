@@ -1,4 +1,5 @@
-from app.service import products
+from app.crud.products import crud
+from app.service import crud_service
 
 
 def test_create_product(product_vegetable, category_food, unit_kg):
@@ -24,7 +25,8 @@ def test_create_few_products(few_products):
 
 
 def test_update_product(product_vegetable, category_food, unit_kg):
-    updated_product = products.update_product(
+    updated_product = crud_service.update_item(
+        crud,
         product_vegetable.id,
         name='Огурцы свежие',
         category_id=category_food.id,
@@ -37,7 +39,10 @@ def test_update_product(product_vegetable, category_food, unit_kg):
 
 
 def test_get_product_by_id(product_vegetable):
-    product = products.get_product(product_vegetable.id)
+    product = crud_service.get_item(
+        crud,
+        product_vegetable.id,
+    )
     assert product is not None
     assert product.id == product_vegetable.id
     assert product.name == 'Огурцы'
@@ -46,7 +51,7 @@ def test_get_product_by_id(product_vegetable):
 
 
 def test_get_list_product(few_products):
-    product_list = products.list_products()
+    product_list = crud_service.list_items(crud)
     assert len(product_list) == 3
     product_names = [product.name for product in product_list]
     assert 'Помидоры' in product_names

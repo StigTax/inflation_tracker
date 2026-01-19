@@ -91,7 +91,6 @@ def update_purchase(
 
 def get_purchase_by_id(purchase_id: int) -> Purchase:
     with get_session() as db:
-        # ключевое: строго keyword-аргументы, db должен быть Session
         return purchase_crud.get_with_normal_attr_or_raise(
             db=db,
             obj_id=purchase_id,

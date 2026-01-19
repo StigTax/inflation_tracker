@@ -37,10 +37,11 @@ class PurchaseCRUD(CRUDBase[Purchase]):
     def list(
         self,
         db: Session,
-        offset: int = 0,
-        limit: int = 100,
+        *,
+        offset=0,
+        limit=100,
         order_by=None,
-    ) -> list[Purchase]:
+    ) -> list[Product]:
         stmt = select(Purchase)
         if order_by is not None:
             stmt = stmt.order_by(order_by)

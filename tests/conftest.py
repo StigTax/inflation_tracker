@@ -1,16 +1,15 @@
+import os
 from contextlib import contextmanager
 from datetime import date
-import os
 
 import pytest
+from app.core.db import Base
+from app.models import Category, Product, Store, Unit
+from app.service import purchases, crud_service
+from app.crud import category_crud, product_crud, store_crud, unit_crud
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
-from app.core.db import Base
-from app.models import Category, Product, Store, Unit
-from app.service import categories, products, purchases, stores, units
-
 
 DB_URL = os.getenv('TEST_DATABASE_URL', 'sqlite+pysqlite:///:memory:')
 
@@ -55,11 +54,8 @@ def override_get_session(monkeypatch, engine):
     monkeypatch.setattr(db_module, 'get_session', _get_session)
 
     for mod_path in [
-        'app.service.categories',
-        'app.service.stores',
-        'app.service.products',
         'app.service.purchases',
-        'app.service.units',
+        'app.service.crud_service',
     ]:
         try:
             mod = __import__(mod_path, fromlist=['get_session'])
@@ -72,21 +68,25 @@ def override_get_session(monkeypatch, engine):
 @pytest.fixture
 def category_food():
     obj = Category(name='Овощи', description='Свежие овощи')
-    return categories.create_category(obj)
+    return crud_service.create_item(category_crud, obj)
 
 
 @pytest.fixture
 def few_categories():
     return [
-        categories.create_category(
+        crud_service.create_item(
+            category_crud,
             Category(name='Напитки', description='Соки и воды')),
-        categories.create_category(
+        crud_service.create_item(
+            category_crud,
             Category(
                 name='Молочные продукты',
                 description='Свежие молочные продукты',
             ),
         ),
-        categories.create_category(Category(name='Хлебобулочные изделия')),
+        crud_service.create_item(
+            category_crud, Category(name='Хлебобулочные изделия')
+        ),
     ]
 
 
@@ -94,28 +94,41 @@ def few_categories():
 @pytest.fixture
 def single_store():
     obj = Store(name='Магнит', description='Магнит - магазин для всей семьи')
-    return stores.create_store(obj)
+    return crud_service.create_item(store_crud, obj)
 
 
 @pytest.fixture
 def few_stores():
     return [
-        stores.create_store(
-            Store(name='Пятерочка', description='Пятерочка выручает')),
-        stores.create_store(Store(name='Яндекс.Лавка')),
-        stores.create_store(Store(name='Дикси')),
+        crud_service.create_item(
+            store_crud,
+            Store(name='Пятерочка', description='Пятерочка выручает')
+        ),
+        crud_service.create_item(
+            store_crud,
+            Store(name='Яндекс.Лавка')
+        ),
+        crud_service.create_item(
+            store_crud,
+            Store(name='Дикси')
+        ),
     ]
 
 
 # ---------- fixtures: units ----------
 @pytest.fixture
 def unit_kg():
-    return units.create_unit(Unit(measure_type='вес', unit='кг'))
+    return crud_service.create_item(
+        unit_crud, Unit(measure_type='вес', unit='кг')
+    )
 
 
 @pytest.fixture
 def unit_l():
-    return units.create_unit(Unit(measure_type='объем', unit='л'))
+    return crud_service.create_item(
+        store_crud,
+        Unit(measure_type='объем', unit='л')
+    )
 
 
 # ---------- fixtures: products ----------
@@ -126,7 +139,7 @@ def product_vegetable(category_food, unit_kg):
         category_id=category_food.id,
         unit_id=unit_kg.id,
     )
-    return products.create_product(obj)
+    return crud_service.create_item(product_crud, obj)
 
 
 @pytest.fixture
@@ -136,25 +149,28 @@ def product_no_category(unit_l):
         category_id=None,
         unit_id=unit_l.id,
     )
-    return products.create_product(obj)
+    return crud_service.create_item(product_crud, obj)
 
 
 @pytest.fixture
 def few_products(category_food, unit_kg):
     return [
-        products.create_product(
+        crud_service.create_item(
+            product_crud,
             Product(
                 name='Помидоры',
                 category_id=category_food.id,
                 unit_id=unit_kg.id,
             )),
-        products.create_product(
+        crud_service.create_item(
+            product_crud,
             Product(
                 name='Морковь',
                 category_id=category_food.id,
                 unit_id=unit_kg.id,
             )),
-        products.create_product(
+        crud_service.create_item(
+            product_crud,
             Product(
                 name='Капуста',
                 category_id=category_food.id,
