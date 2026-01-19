@@ -1,8 +1,8 @@
-"""Инициализация БД
+"""Инициализация DB
 
-Revision ID: 73d321e4778b
+Revision ID: 16269c5dd309
 Revises: 
-Create Date: 2026-01-19 00:40:57.032632
+Create Date: 2026-01-19 23:22:42.078806
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '73d321e4778b'
+revision: str = '16269c5dd309'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -62,9 +62,11 @@ def upgrade() -> None:
     sa.Column('product_id', sa.Integer(), nullable=False, comment='ID продукта'),
     sa.Column('store_id', sa.Integer(), nullable=True, comment='ID магазина'),
     sa.Column('purchase_date', sa.Date(), nullable=False, comment='Дата покупки'),
-    sa.Column('quantity', sa.Float(), nullable=False, comment='Количество купленного товара'),
-    sa.Column('total_price', sa.Float(), nullable=False, comment='Общая стоимость покупки'),
-    sa.Column('unit_price', sa.Float(), nullable=False, comment='Цена за единицу товара'),
+    sa.Column('quantity', sa.Numeric(precision=12, scale=3), nullable=False, comment='Количество купленного товара'),
+    sa.Column('total_price', sa.Numeric(precision=12, scale=2), nullable=False, comment='Общая стоимость покупки'),
+    sa.Column('regular_unit_price', sa.Numeric(precision=12, scale=2), nullable=True, comment='Обычная цена за единицу (без акции), если известна'),
+    sa.Column('is_promo', sa.Boolean(), server_default='0', nullable=False, comment='Товар по акции или нет.'),
+    sa.Column('promo_type', sa.String(length=32), nullable=True, comment='Тип акции: discount/multi_buy/loyalty/clearance/coupon/cashback'),
     sa.Column('comment', sa.Text(), nullable=True, comment='Комментарий к покупке'),
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('to_create', sa.DateTime(), nullable=False),

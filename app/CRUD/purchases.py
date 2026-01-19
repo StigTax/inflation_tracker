@@ -41,8 +41,11 @@ class PurchaseCRUD(CRUDBase[Purchase]):
         offset=0,
         limit=100,
         order_by=None,
-    ) -> list[Product]:
+        is_promo: Optional[bool] = None
+    ) -> list[Purchase]:
         stmt = select(Purchase)
+        if is_promo is not None:
+            stmt = stmt.where(Purchase.is_promo == is_promo)
         if order_by is not None:
             stmt = stmt.order_by(order_by)
         stmt = self._with_relations(stmt.offset(offset).limit(limit))
@@ -52,12 +55,14 @@ class PurchaseCRUD(CRUDBase[Purchase]):
         self,
         db: Session,
         store_id: int,
+        is_promo: Optional[bool] = None,
     ) -> list[Purchase]:
-        stmt = self._with_relations(
-            select(Purchase)
-            .where(Purchase.store_id == store_id)
-            .order_by(Purchase.purchase_date),
-        )
+        stmt = select(Purchase).where(Purchase.store_id == store_id)
+
+        if is_promo is not None:
+            stmt = stmt.where(Purchase.is_promo == is_promo)
+
+        stmt = self._with_relations(stmt.order_by(Purchase.purchase_date))
         return list(db.scalars(stmt).all())
 
     def get_purchase_by_product(
@@ -66,8 +71,12 @@ class PurchaseCRUD(CRUDBase[Purchase]):
         product_id: int,
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
+        is_promo: Optional[bool] = None,
     ) -> list[Purchase]:
         stmt = select(Purchase).where(Purchase.product_id == product_id)
+
+        if is_promo is not None:
+            stmt = stmt.where(Purchase.is_promo == is_promo)
 
         if date_from is not None:
             stmt = stmt.where(Purchase.purchase_date >= date_from)

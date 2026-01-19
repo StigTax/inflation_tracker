@@ -33,10 +33,29 @@ def _create(
         price=args.total_price,
         purchase_date=args.date,
         comment=args.comment,
+        is_promo=args.promo,
+        promo_type=args.promo_type,
+        regular_unit_price=args.regular_unit_price,
     )
 
 
 def _update(args: argparse.Namespace) -> Purchase:
+    if args.promo and args.no_promo:
+        raise ValueError("Нельзя одновременно --promo и --no-promo")
+
+    if args.no_promo and (
+        args.promo_type is not None or args.regular_unit_price is not None
+    ):
+        raise ValueError(
+            "С --no-promo нельзя передавать --promo-type/--regular-unit-price"
+        )
+
+    is_promo = None
+    if args.promo:
+        is_promo = True
+    elif args.no_promo:
+        is_promo = False
+
     return update_purchase(
         purchase_id=args.id,
         store_id=args.store_id,
@@ -45,25 +64,50 @@ def _update(args: argparse.Namespace) -> Purchase:
         quantity=args.quantity,
         comment=args.comment,
         purchase_date=args.date,
+        is_promo=is_promo,
+        promo_type=args.promo_type,
+        regular_unit_price=args.regular_unit_price,
     )
 
 
 def _list(args: argparse.Namespace) -> list[Purchase]:
+    promo_filter = None
+    if args.promo_only and args.no_promo_only:
+        raise ValueError("Нельзя одновременно --promo-only и --no-promo-only")
+    if args.promo_only:
+        promo_filter = True
+    if args.no_promo_only:
+        promo_filter = False
+
     if args.product_id is not None:
         return get_purchase_by_product(
             product_id=args.product_id,
             from_date=args.from_date,
             to_date=args.to_date,
+            is_promo=promo_filter,
         )
 
-        if args.store_id is not None:
-            return get_purchase_by_store(store_id=args.store_id)
+    if args.store_id is not None:
+        items = get_purchase_by_store(
+            store_id=args.store_id,
+            is_promo=promo_filter
+        )
+        if args.from_date is not None:
+            items = [
+                item for item in items if item.purchase_date >= args.from_date
+            ]
+        if args.to_date is not None:
+            items = [
+                item for item in items if item.purchase_date <= args.to_date
+            ]
+        return items
 
     order_col = ORDER_MAP[args.order]
     return list_purchases(
         offset=args.offset,
         limit=args.limit,
-        order_by=order_col
+        order_by=order_col,
+        is_promo=promo_filter,
     )
 
 
@@ -123,6 +167,28 @@ def register_purchase_commands(
                     'help': 'Комментарий.'
                 }
             ),
+            ArgSpec(
+                ('--promo',),
+                {
+                    'action': 'store_true',
+                    'help': 'Покупка по акции'
+                }
+            ),
+            ArgSpec(
+                ('--promo-type',),
+                {
+                    'default': None,
+                    'help': 'Тип акции (discount/multi_buy/...)'
+                }
+            ),
+            ArgSpec(
+                ('--regular-unit-price',),
+                {
+                    'type': float,
+                    'default': None,
+                    'help': 'Обычная цена за единицу (если знаешь)'
+                }
+            ),
         ],
 
         # update
@@ -155,6 +221,35 @@ def register_purchase_commands(
                 ('--comment',),
                 {'default': None}
             ),
+            ArgSpec(
+                ('--promo',),
+                {
+                    'action': 'store_true',
+                    'help': 'Сделать покупку акционной'
+                }
+            ),
+            ArgSpec(
+                ('--no-promo',),
+                {
+                    'action': 'store_true',
+                    'help': 'Снять флаг акции и очистить поля промо'
+                }
+            ),
+            ArgSpec(
+                ('--promo-type',),
+                {
+                    'default': None,
+                    'help': 'Тип акции'
+                }
+            ),
+            ArgSpec(
+                ('--regular-unit-price',),
+                {
+                    'type': float,
+                    'default': None,
+                    'help': 'Обычная цена за единицу'
+                }
+            ),
         ],
 
         create_fields=(),
@@ -163,7 +258,6 @@ def register_purchase_commands(
         order_by=ORDER_MAP,
         default_order='purchase_date',
 
-        # дополнительные аргументы для list (фильтры)
         list_args=[
             ArgSpec(
                 ('--product-id',),
@@ -197,36 +291,37 @@ def register_purchase_commands(
                     'help': 'Дата конца (YYYY-MM-DD)'
                 }
             ),
+            ArgSpec(
+                ('--promo-only',),
+                {
+                    'action': 'store_true',
+                    'help': 'Показать только акционные'
+                }
+            ),
+            ArgSpec(
+                ('--no-promo-only',),
+                {
+                    'action': 'store_true',
+                    'help': 'Показать только неакционные'
+                }
+            ),
         ],
 
         table=TableSpec(
             columns=(
-                'id',
-                'purchase_date',
-                'product',
-                'category',
-                'quantity',
-                'unit',
-                'measure_type',
-                'total_price',
-                'unit_price',
+                'id', 'purchase_date', 'product', 'category',
+                'quantity', 'unit', 'total_price', 'unit_price',
+                'is_promo', 'promo_type', 'regular_unit_price',
                 'store',
             ),
             headers=(
-                'ID',
-                'Дата',
-                'Товар',
-                'Категория',
-                'Кол-во',
-                'Ед.',
-                'Тип',
-                'Сумма',
-                'Цена/ед',
+                'ID', 'Дата', 'Товар', 'Категория',
+                'Кол-во', 'Ед.', 'Сумма', 'Цена/ед',
+                'Акция', 'Тип акции', 'Обычн./ед',
                 'Магазин',
             ),
         ),
 
-        # хуки
         create_fn=_create,
         update_fn=_update,
         delete_fn=lambda obj_id: delete_purchase(purchase_id=obj_id),

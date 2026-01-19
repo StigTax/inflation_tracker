@@ -20,12 +20,26 @@ def create_purchase(
     price: float,
     purchase_date: Optional[date] = None,
     comment: Optional[str] = None,
+    is_promo: bool = False,
+    promo_type: Optional[str] = None,
+    regular_unit_price: Optional[float] = None,
 ) -> Purchase:
     quantity = validate_positive_value(quantity, 'Количество товара')
     price = validate_positive_value(price, 'Стоимость товара')
 
+    if regular_unit_price is not None:
+        regular_unit_price = validate_positive_value(
+            regular_unit_price, 'Обычная цена за единицу'
+        )
+
+    is_promo = bool(
+        is_promo or promo_type is not None or regular_unit_price is not None
+    )
+    if not is_promo:
+        promo_type = None
+        regular_unit_price = None
+
     purchase_date = validate_date_not_in_future(purchase_date)
-    unit_price = price / quantity
 
     with get_session() as db:
         purchase = Purchase(
@@ -33,9 +47,11 @@ def create_purchase(
             product_id=product_id,
             quantity=quantity,
             total_price=price,
-            unit_price=unit_price,
             purchase_date=purchase_date,
             comment=comment,
+            is_promo=is_promo,
+            promo_type=promo_type,
+            regular_unit_price=regular_unit_price,
         )
         created = purchase_crud.create(db=db, obj_in=purchase, commit=True)
         return purchase_crud.get_with_normal_attr_or_raise(
@@ -53,17 +69,21 @@ def update_purchase(
     quantity: Optional[float] = None,
     comment: Optional[str] = None,
     purchase_date: Optional[date] = None,
+    is_promo: Optional[bool] = None,
+    promo_type: Optional[str] = None,
+    regular_unit_price: Optional[float] = None,
 ) -> Purchase:
-    need_recalc = False
 
     if total_price is not None:
         total_price = validate_positive_value(total_price, 'Стоимость товара')
-        need_recalc = True
     if quantity is not None:
         quantity = validate_positive_value(quantity, 'Количество товара')
-        need_recalc = True
     if purchase_date is not None:
         purchase_date = validate_date_not_in_future(purchase_date)
+    if regular_unit_price is not None:
+        regular_unit_price = validate_positive_value(
+            regular_unit_price, 'Обычная цена за единицу'
+        )
 
     with get_session() as db:
         purchase = purchase_crud.update(
@@ -78,8 +98,19 @@ def update_purchase(
             purchase_date=purchase_date,
         )
 
-        if need_recalc:
-            purchase.unit_price = purchase.total_price / purchase.quantity
+        if is_promo is not None:
+            purchase.is_promo = is_promo
+            if not is_promo:
+                purchase.promo_type = None
+                purchase.regular_unit_price = None
+
+        if promo_type is not None:
+            purchase.promo_type = promo_type
+            purchase.is_promo = True
+
+        if regular_unit_price is not None:
+            purchase.regular_unit_price = regular_unit_price
+            purchase.is_promo = True
 
         db.commit()
         db.refresh(purchase)
@@ -101,6 +132,7 @@ def get_purchase_by_product(
     product_id: int,
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
+    is_promo: Optional[bool] = None,
 ) -> list[Purchase]:
     with get_session() as db:
         return purchase_crud.get_purchase_by_product(
@@ -108,25 +140,35 @@ def get_purchase_by_product(
             product_id=product_id,
             date_from=from_date,
             date_to=to_date,
+            is_promo=is_promo,
         )
 
 
-def get_purchase_by_store(store_id: int) -> list[Purchase]:
+def get_purchase_by_store(
+    store_id: int,
+    is_promo: Optional[bool] = None
+) -> list[Purchase]:
     with get_session() as db:
-        return purchase_crud.get_purchase_by_store(db=db, store_id=store_id)
+        return purchase_crud.get_purchase_by_store(
+            db=db,
+            store_id=store_id,
+            is_promo=is_promo
+        )
 
 
 def list_purchases(
     offset: int = 0,
     limit: int = 100,
-    order_by=None
+    order_by=None,
+    is_promo: Optional[bool] = None
 ) -> list[Purchase]:
     with get_session() as db:
         return purchase_crud.list(
             db=db,
             offset=offset,
             limit=limit,
-            order_by=order_by
+            order_by=order_by,
+            is_promo=is_promo
         )
 
 

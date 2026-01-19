@@ -70,7 +70,7 @@ class Unit(Base):
     )
 
     #  ----- Связи -----
-    product = relationship(
+    products = relationship(
         'Product',
         back_populates='unit',
     )
@@ -80,7 +80,7 @@ class Unit(Base):
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id,
-            "unit": self.unit,
-            "measure_type": self.measure_type,
+            'id': self.id,
+            'unit': self.unit,
+            'measure_type': self.measure_type,
         }
