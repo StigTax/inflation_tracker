@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import argparse
 
-from app.cli.common import (
-    add_list_args,
-    parse_date,
-    print_item,
-    print_list_items,
-    print_list_verbose,
-    print_table,
+from app.cli.common import parse_date
+from app.cli.crud_commands import (
+    ArgSpec,
+    CrudCommandSpec,
+    TableSpec,
+    register_crud_commands,
 )
 from app.core.constants import ORDER_MAP
+from app.crud.purchases import crud as purchase_crud
 from app.models import Purchase
 from app.service.purchases import (
     create_purchase,
@@ -23,112 +23,183 @@ from app.service.purchases import (
 )
 
 
-def add_purchase_fields(
-    parser: argparse.ArgumentParser,
-    *,
-    required: bool,
+def _create(
+    args: argparse.Namespace
+) -> Purchase:
+    return create_purchase(
+        store_id=args.store_id,
+        product_id=args.product_id,
+        quantity=args.quantity,
+        price=args.total_price,
+        purchase_date=args.date,
+        comment=args.comment,
+    )
+
+
+def _update(args: argparse.Namespace) -> Purchase:
+    return update_purchase(
+        purchase_id=args.id,
+        store_id=args.store_id,
+        product_id=args.product_id,
+        total_price=args.total_price,
+        quantity=args.quantity,
+        comment=args.comment,
+        purchase_date=args.date,
+    )
+
+
+def _list(args: argparse.Namespace) -> list[Purchase]:
+    if args.product_id is not None:
+        return get_purchase_by_product(
+            product_id=args.product_id,
+            from_date=args.from_date,
+            to_date=args.to_date,
+        )
+
+        if args.store_id is not None:
+            return get_purchase_by_store(store_id=args.store_id)
+
+    order_col = ORDER_MAP[args.order]
+    return list_purchases(
+        offset=args.offset,
+        limit=args.limit,
+        order_by=order_col
+    )
+
+
+def register_purchase_commands(
+    subparsers: argparse._SubParsersAction
 ) -> None:
-    """Поля для add/update.
-
-    Для add: required=True, для update: required=False.
-    """
-    parser.add_argument(
-        '-p',
-        '--product-id',
-        type=int,
-        required=required,
-        help='Продукт (ID).',
-    )
-    parser.add_argument(
-        '-s',
-        '--store-id',
-        type=int,
-        required=required,
-        default=None,
-        help='Магазин (ID).',
-    )
-    parser.add_argument(
-        '-q',
-        '--quantity',
-        type=float,
-        required=required,
-        default=None,
-        help='Количество товара (упаковок).',
-    )
-    parser.add_argument(
-        '-tp',
-        '--total-price',
-        type=float,
-        required=required,
-        default=None,
-        help='Общая стоимость (по чеку).',
-    )
-    parser.add_argument(
-        '-c',
-        '--comment',
-        default=None,
-        help='Комментарий к покупке.',
-    )
-
-
-def register_purchase_commands(subparsers: argparse._SubParsersAction) -> None:
-    pars = subparsers.add_parser(
-        'purchase',
+    spec = CrudCommandSpec(
+        command='purchase',
         help='Управление покупками.',
-    )
-    subpars = pars.add_subparsers(dest='action', required=True)
+        crud=purchase_crud,
+        model_cls=Purchase,
 
-    add = subpars.add_parser('add', help='Добавить покупку.')
-    add.add_argument(
-        '--date',
-        type=parse_date,
-        default=None,
-        help='Дата покупки (YYYY-MM-DD). Если не указана — сегодня.',
-    )
-    add_purchase_fields(add, required=True)
-    add.set_defaults(func=cmd_add)
+        # add
+        add_args=[
+            ArgSpec(
+                ('--date',),
+                {
+                    'type': parse_date, 'default': None,
+                    'help': 'Дата покупки (YYYY-MM-DD). default сегодня.'
+                }
+            ),
+            ArgSpec(
+                ('-p', '--product-id'),
+                {
+                    'type': int,
+                    'required': True,
+                    'help': 'Продукт (ID).'
+                }
+            ),
+            ArgSpec(('-s', '--store-id'),
+                    {
+                        'type': int,
+                        'required': True,
+                        'help': 'Магазин (ID).'
+                    }
+                ),
+            ArgSpec(
+                ('-q', '--quantity'),
+                {
+                    'type': float,
+                    'required': True, 'help':
+                    'Количество (упаковок).'
+                }
+            ),
+            ArgSpec(
+                ('-tp', '--total-price'),
+                {
+                    'type': float,
+                    'required': True,
+                    'help': 'Сумма по чеку.'
+                }
+            ),
+            ArgSpec(
+                ('-c', '--comment'),
+                {
+                    'default': None,
+                    'help': 'Комментарий.'
+                }
+            ),
+        ],
 
-    lst = subpars.add_parser('list', help='Список покупок')
-    grp = lst.add_mutually_exclusive_group()
-    grp.add_argument('--full', action='store_true',
-                     help='key: value для каждого объекта')
-    grp.add_argument('--table', action='store_true', help='табличный вывод')
-    add_list_args(lst, order_choices=('id', 'product', 'purchase_date',
-                  'store', 'quantity'), default_order='purchase_date')
-    lst.add_argument('--product-id', type=int, default=None,
-                     help='Фильтр по продукту (ID)')
-    lst.add_argument('--store-id', type=int, default=None,
-                     help='Фильтр по магазину (ID)')
-    lst.add_argument('--from-date', type=parse_date,
-                     default=None, help='Дата начала (YYYY-MM-DD)')
-    lst.add_argument('--to-date', type=parse_date,
-                     default=None, help='Дата конца (YYYY-MM-DD)')
-    lst.set_defaults(func=cmd_list)
+        # update
+        update_args=[
+            ArgSpec(
+                ('--date',),
+                {
+                    'type': parse_date,
+                    'default': None,
+                    'help': 'Новая дата (YYYY-MM-DD).'
+                }
+            ),
+            ArgSpec(
+                ('--product-id',),
+                {'type': int, 'default': None}
+            ),
+            ArgSpec(
+                ('--store-id',),
+                {'type': int, 'default': None}
+            ),
+            ArgSpec(
+                ('--quantity',),
+                {'type': float, 'default': None}
+            ),
+            ArgSpec(
+                ('--total-price',),
+                {'type': float, 'default': None}
+            ),
+            ArgSpec(
+                ('--comment',),
+                {'default': None}
+            ),
+        ],
 
-    get = subpars.add_parser('get', help='Получить покупку по id')
-    get.add_argument('id', type=int)
-    get.set_defaults(func=cmd_get)
+        create_fields=(),
+        update_fields=(),
 
-    upd = subpars.add_parser('update', help='Обновить покупку')
-    upd.add_argument('id', type=int)
-    upd.add_argument(
-        '--date',
-        type=parse_date,
-        default=None,
-        help='Новая дата покупки (YYYY-MM-DD).',
-    )
-    add_purchase_fields(upd, required=False)
-    upd.set_defaults(func=cmd_update)
+        order_by=ORDER_MAP,
+        default_order='purchase_date',
 
-    rm = subpars.add_parser('delete', help='Удалить покупку')
-    rm.add_argument('id', type=int)
-    rm.set_defaults(func=cmd_delete)
+        # дополнительные аргументы для list (фильтры)
+        list_args=[
+            ArgSpec(
+                ('--product-id',),
+                {
+                    'type': int,
+                    'default': None,
+                    'help': 'Фильтр по продукту (ID)'
+                }
+            ),
+            ArgSpec(
+                ('--store-id',),
+                {
+                    'type': int,
+                    'default': None,
+                    'help': 'Фильтр по магазину (ID)'
+                }
+            ),
+            ArgSpec(
+                ('--from-date',),
+                {
+                    'type': parse_date,
+                    'default': None,
+                    'help': 'Дата начала (YYYY-MM-DD)'
+                }
+            ),
+            ArgSpec(
+                ('--to-date',),
+                {
+                    'type': parse_date,
+                    'default': None,
+                    'help': 'Дата конца (YYYY-MM-DD)'
+                }
+            ),
+        ],
 
-
-def _print_purchases(items: list[Purchase], args: argparse.Namespace) -> None:
-    if args.table:
-        print_table(
-            items,
+        table=TableSpec(
             columns=(
                 'id',
                 'purchase_date',
@@ -145,77 +216,22 @@ def _print_purchases(items: list[Purchase], args: argparse.Namespace) -> None:
                 'ID',
                 'Дата',
                 'Товар',
-                'категория',
+                'Категория',
                 'Кол-во',
-                'Ед. Изм.',
-                'Вид Ед. Изм.',
+                'Ед.',
+                'Тип',
                 'Сумма',
                 'Цена/ед',
                 'Магазин',
             ),
-        )
-    elif args.full:
-        print_list_verbose(items)
-    else:
-        print_list_items(items)
+        ),
 
-
-def cmd_add(args: argparse.Namespace) -> None:
-    obj = create_purchase(
-        store_id=args.store_id,
-        product_id=args.product_id,
-        quantity=args.quantity,
-        price=args.total_price,
-        purchase_date=args.date,
-        comment=args.comment,
+        # хуки
+        create_fn=_create,
+        update_fn=_update,
+        delete_fn=lambda obj_id: delete_purchase(purchase_id=obj_id),
+        get_fn=lambda obj_id: get_purchase_by_id(purchase_id=obj_id),
+        list_fn=_list,
     )
-    obj = get_purchase_by_id(purchase_id=obj.id)
-    print_item(obj)
 
-
-def cmd_list(args: argparse.Namespace) -> None:
-    if args.product_id is not None:
-        items = get_purchase_by_product(
-            product_id=args.product_id,
-            from_date=args.from_date,
-            to_date=args.to_date,
-        )
-        _print_purchases(items, args)
-        return
-
-    if args.store_id is not None:
-        items = get_purchase_by_store(args.store_id)
-        _print_purchases(items, args)
-        return
-
-    order_col = ORDER_MAP[args.order]
-    items = list_purchases(
-        offset=args.offset,
-        limit=args.limit,
-        order_by=order_col,
-    )
-    _print_purchases(items, args)
-
-
-def cmd_get(args: argparse.Namespace) -> None:
-    obj = get_purchase_by_id(purchase_id=args.id)
-    print_item(obj)
-
-
-def cmd_update(args: argparse.Namespace) -> None:
-    obj = update_purchase(
-        purchase_id=args.id,
-        store_id=args.store_id,
-        product_id=args.product_id,
-        quantity=args.quantity,
-        total_price=args.total_price,
-        comment=args.comment,
-        purchase_date=args.date,
-    )
-    obj = get_purchase_by_id(purchase_id=obj.id)
-    print_item(obj)
-
-
-def cmd_delete(args: argparse.Namespace) -> None:
-    delete_purchase(purchase_id=args.id)
-    print(f'OK deleted id={args.id}')
+    register_crud_commands(subparsers, spec)

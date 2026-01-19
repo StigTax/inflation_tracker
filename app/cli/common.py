@@ -35,8 +35,8 @@ def parse_date(value: str) -> date:
 
 def print_table(
     objs: Sequence[Any],
-    columns: Sequence[str] | None = None,
-    headers: Sequence[str] | None = None,
+    columns: Optional[Sequence[str]] = None,
+    headers: Optional[Sequence[str]] = None,
 ) -> None:
     if not objs:
         print('(пусто)')
@@ -61,9 +61,12 @@ def print_table(
 
 
 def print_item(obj: Any) -> None:
-    data = obj.to_dict()
-    for key, value in data.items():
-        print(f'{key}: {value}')
+    data = obj.to_dict() if hasattr(obj, "to_dict") else obj
+    if isinstance(data, dict):
+        for k, v in data.items():
+            print(f"{k}: {v}")
+    else:
+        print(data)
 
 
 def print_list_items(objs: list[Any]) -> None:
