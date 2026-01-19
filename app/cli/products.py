@@ -79,7 +79,8 @@ def cmd_add(args: argparse.Namespace) -> None:
         category_id=args.category_id,
         unit_id=args.unit_id,
     )
-    obj = get_product(product_id=args.id)
+    created = create_item(crud=product_crud, obj_in=obj)
+    obj = get_product(product_id=created.id)
     print_item(obj)
 
 

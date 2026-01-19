@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional, TypeVar
 
-from app.core.db import get_session
+import app.core.db as db
 
 ModelT = TypeVar('ModelT')
 
@@ -11,7 +11,7 @@ def get_item(
     crud,
     item_id: int,
 ) -> Optional[ModelT]:
-    with get_session() as session:
+    with db.get_session() as session:
         item = crud.get_or_raise(
             db=session,
             obj_id=item_id,
@@ -25,7 +25,7 @@ def list_items(
     limit: int = 100,
     order_by: Optional[Any] = None,
 ) -> list[ModelT]:
-    with get_session() as session:
+    with db.get_session() as session:
         items = crud.list(
             db=session,
             offset=offset,
@@ -39,7 +39,7 @@ def create_item(
     crud,
     obj_in: ModelT,
 ) -> ModelT:
-    with get_session() as session:
+    with db.get_session() as session:
         item = crud.create(
             db=session,
             obj_in=obj_in,
@@ -52,7 +52,7 @@ def update_item(
     item_id: int,
     **fields: Any,
 ) -> ModelT:
-    with get_session() as session:
+    with db.get_session() as session:
         item = crud.update(
             db=session,
             obj_id=item_id,
@@ -65,7 +65,7 @@ def delete_item(
     crud,
     item_id: int,
 ) -> None:
-    with get_session() as session:
+    with db.get_session() as session:
         item = crud.delete(
             db=session,
             obj_id=item_id,

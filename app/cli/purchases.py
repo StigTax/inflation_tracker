@@ -217,5 +217,5 @@ def cmd_update(args: argparse.Namespace) -> None:
 
 
 def cmd_delete(args: argparse.Namespace) -> None:
-    delete_purchase(purchase_id=args.id, commit=True)
+    delete_purchase(purchase_id=args.id)
     print(f'OK deleted id={args.id}')
