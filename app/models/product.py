@@ -39,7 +39,7 @@ class Product(Base):
     )
     unit = relationship(
         'Unit',
-        back_populates='product',
+        back_populates='products',
     )
 
     def __repr__(self) -> str:
