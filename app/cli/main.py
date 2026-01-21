@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 
 from app.cli import categories, products, purchases, stores, units
 from app.cli.common import configure_db
+from app.core.config_log import configure_logging
 
+logger = logging.getLogger(__name__)
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -39,6 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main():
+    configure_logging()
     parser = build_parser()
     args = parser.parse_args()
     configure_db(db_url=args.db_url, echo_sql=args.echo_sql)
@@ -46,6 +50,11 @@ def main():
     try:
         args.func(args)
     except Exception as e:
+        logger.exceprion(
+            'CLI command failed: entry=%s, action=%s',
+            getattr(args, 'entry', None),
+            getattr(args, 'action', None),
+        )
         print(f'ERROR: {e}', file=sys.stderr)
         raise SystemExit(1)
 

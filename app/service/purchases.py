@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import logging
 from datetime import date
 from typing import Optional
 
 from app.core.db import get_session
 from app.crud.purchases import crud as purchase_crud
+from app.logging import logged
 from app.models import Purchase
 from app.validate.validators import (
     validate_date_not_in_future,
@@ -12,6 +14,7 @@ from app.validate.validators import (
 )
 
 
+@logged(level=logging.INFO, skip_empty=True)
 def create_purchase(
     *,
     store_id: int,
@@ -60,6 +63,7 @@ def create_purchase(
         )
 
 
+@logged(level=logging.INFO, skip_empty=True)
 def update_purchase(
     *,
     purchase_id: int,
@@ -120,6 +124,7 @@ def update_purchase(
         )
 
 
+@logged(level=logging.DEBUG)
 def get_purchase_by_id(purchase_id: int) -> Purchase:
     with get_session() as db:
         return purchase_crud.get_with_normal_attr_or_raise(
@@ -128,6 +133,7 @@ def get_purchase_by_id(purchase_id: int) -> Purchase:
         )
 
 
+@logged(level=logging.DEBUG)
 def get_purchase_by_product(
     product_id: int,
     from_date: Optional[date] = None,
@@ -144,6 +150,7 @@ def get_purchase_by_product(
         )
 
 
+@logged(level=logging.DEBUG)
 def get_purchase_by_store(
     store_id: int,
     is_promo: Optional[bool] = None
@@ -156,6 +163,7 @@ def get_purchase_by_store(
         )
 
 
+@logged(level=logging.DEBUG)
 def list_purchases(
     offset: int = 0,
     limit: int = 100,
@@ -172,6 +180,7 @@ def list_purchases(
         )
 
 
+@logged(level=logging.INFO)
 def delete_purchase(purchase_id: int) -> None:
     with get_session() as db:
         purchase_crud.delete(db=db, obj_id=purchase_id)

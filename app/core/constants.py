@@ -23,3 +23,6 @@ ORDER_MAP = {
     'store': Purchase.store_id,
     'quantity': Purchase.quantity,
 }
+
+DEFAULT_MAXLEN = 220
+UNHANDLED = object()

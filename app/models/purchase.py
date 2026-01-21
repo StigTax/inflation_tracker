@@ -88,6 +88,16 @@ class Purchase(Base):
             Decimal(self.total_price) / Decimal(self.quantity)
         ).quantize(Decimal("0.01"))
 
+    @property
+    def effective_regular_unit_price(self) -> Decimal:
+        if self.regular_unit_price is not None:
+            return (
+                Decimal(str(self.regular_unit_price)).quantize(
+                    Decimal('0.01')
+                )
+            )
+        return self.unit_price
+
     @validates("quantity", "total_price")
     def _validate_non_negative(self, key, value):
         if value is None:

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Optional, TypeVar
 
 from app.core.db import get_session
+from app.logging import logged
 
 ModelT = TypeVar('ModelT')
 
 
+@logged(level=logging.DEBUG)
 def get_item(
     crud,
     item_id: int,
@@ -19,6 +22,7 @@ def get_item(
         return item
 
 
+@logged(level=logging.DEBUG)
 def list_items(
     crud,
     offset: int = 0,
@@ -35,6 +39,7 @@ def list_items(
         return items
 
 
+@logged(level=logging.INFO, skip_empty=True)
 def create_item(
     crud,
     obj_in: ModelT,
@@ -47,6 +52,7 @@ def create_item(
         return item
 
 
+@logged(level=logging.INFO, skip_empty=True)
 def update_item(
     crud,
     item_id: int,
@@ -61,6 +67,7 @@ def update_item(
         return item
 
 
+@logged(level=logging.INFO)
 def delete_item(
     crud,
     item_id: int,

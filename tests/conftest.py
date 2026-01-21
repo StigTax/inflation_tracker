@@ -182,24 +182,32 @@ def few_products(category_food, unit_kg):
 # ---------- fixtures: purchases ----------
 @pytest.fixture
 def purchase_product(product_vegetable, few_stores):
+    # обычная покупка (не промо) + фиксированная дата
     return purchases.create_purchase(
         store_id=few_stores[0].id,
         product_id=product_vegetable.id,
         quantity=2.0,
         price=150.0,
-        purchase_date=date.today(),
-        comment='Покупка огурцов',
+        purchase_date=date(2024, 1, 5),
+        comment="Покупка огурцов",
+        is_promo=False,
+        promo_type=None,
+        regular_unit_price=None,
     )
 
 
 @pytest.fixture
 def few_purchase_in_single_store(product_vegetable, single_store):
+    # одна обычная + одна промо (чтобы покрыть новые поля)
     pur_1 = purchases.create_purchase(
         store_id=single_store.id,
         product_id=product_vegetable.id,
         quantity=1.0,
         price=80.0,
         purchase_date=date(2024, 1, 10),
+        is_promo=False,
+        promo_type=None,
+        regular_unit_price=None,
     )
     pur_2 = purchases.create_purchase(
         store_id=single_store.id,
@@ -207,18 +215,25 @@ def few_purchase_in_single_store(product_vegetable, single_store):
         quantity=1.5,
         price=120.0,
         purchase_date=date(2024, 2, 15),
+        is_promo=True,
+        promo_type="discount",
+        regular_unit_price=95.0,
     )
     return [pur_1, pur_2]
 
 
 @pytest.fixture
 def few_purchase_in_few_stores(product_vegetable, few_stores):
+    # микс промо/не промо по разным магазинам
     pur_1 = purchases.create_purchase(
         store_id=few_stores[0].id,
         product_id=product_vegetable.id,
         quantity=2.0,
         price=150.0,
         purchase_date=date(2024, 3, 5),
+        is_promo=False,
+        promo_type=None,
+        regular_unit_price=None,
     )
     pur_2 = purchases.create_purchase(
         store_id=few_stores[1].id,
@@ -226,6 +241,9 @@ def few_purchase_in_few_stores(product_vegetable, few_stores):
         quantity=1.0,
         price=90.0,
         purchase_date=date(2024, 3, 6),
+        is_promo=True,
+        promo_type="loyalty",
+        regular_unit_price=105.0,
     )
     pur_3 = purchases.create_purchase(
         store_id=few_stores[2].id,
@@ -233,5 +251,8 @@ def few_purchase_in_few_stores(product_vegetable, few_stores):
         quantity=3.0,
         price=240.0,
         purchase_date=date(2024, 3, 7),
+        is_promo=False,
+        promo_type=None,
+        regular_unit_price=None,
     )
     return [pur_1, pur_2, pur_3]
