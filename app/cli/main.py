@@ -51,12 +51,11 @@ def main():
         args.func(args)
     except Exception as e:
         logger.error(
-            'CLI command failed: entry=%s, action=%s',
-            getattr(args, 'entry', None),
+            'CLI command failed: entity=%s, action=%s',
+            getattr(args, 'entity', None),
             getattr(args, 'action', None),
         )
-        print(f'ERROR: {e}', file=sys.stderr)
-        raise SystemExit(1)
+        raise SystemExit(e)
 
 
 if __name__ == '__main__':

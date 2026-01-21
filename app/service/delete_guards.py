@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Purchase, Product
-from app.service.exceptions import ObjectInUseError
+from app.models import Product, Purchase
+from app.validate.exceptions import ObjectInUseError
 
 
 def product_has_no_purchases(

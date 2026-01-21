@@ -1,7 +1,7 @@
 import logging
 import re
 from datetime import date as dt_date
-from typing import Optional, TypeVar, Tuple
+from typing import Optional, Tuple, TypeVar
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")

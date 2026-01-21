@@ -3,10 +3,10 @@ from __future__ import annotations
 from app.crud import category_crud, product_crud, store_crud, unit_crud
 from app.service.crud_service import delete_item
 from app.service.delete_guards import (
+    category_has_no_products,
     product_has_no_purchases,
     store_has_no_purchases,
     unit_has_no_products,
-    category_has_no_products,
 )
 
 
