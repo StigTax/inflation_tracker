@@ -10,6 +10,7 @@ from app.cli.crud_commands import (
 )
 from app.crud import unit_crud
 from app.models import Unit
+from app.service.safe_delete import delete_unit
 
 
 def register_unit_commands(subparsers: argparse._SubParsersAction) -> None:
@@ -49,5 +50,6 @@ def register_unit_commands(subparsers: argparse._SubParsersAction) -> None:
             columns=('id', 'measure_type', 'unit'),
             headers=('ID', 'Тип', 'Ед.'),
         ),
+        delete_fn=delete_unit,
     )
     register_crud_commands(subparsers, spec)

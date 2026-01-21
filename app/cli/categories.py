@@ -10,6 +10,7 @@ from app.cli.crud_commands import (
 )
 from app.crud import category_crud
 from app.models import Category
+from app.service.safe_delete import delete_category
 
 
 def register_category_commands(
@@ -48,5 +49,6 @@ def register_category_commands(
             columns=('id', 'name', 'description'),
             headers=('ID', 'Название', 'Описание'),
         ),
+        delete_fn=delete_category,
     )
     register_crud_commands(subparsers, spec)

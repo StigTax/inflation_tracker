@@ -19,12 +19,12 @@ class Product(Base):
     )
     category_id = Column(
         Integer,
-        ForeignKey('category.id'),
+        ForeignKey('category.id', ondelete='SET NULL'),
         nullable=True,
     )
     unit_id = Column(
         Integer,
-        ForeignKey('unit.id'),
+        ForeignKey('unit.id', ondelete='RESTRICT'),
         nullable=False,
     )
 

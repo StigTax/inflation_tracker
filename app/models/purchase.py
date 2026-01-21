@@ -21,13 +21,13 @@ from app.core.db import Base
 class Purchase(Base):
     product_id = Column(
         Integer,
-        ForeignKey('product.id'),
+        ForeignKey('product.id', ondelete='RESTRICT'),
         nullable=False,
         comment='ID продукта',
     )
     store_id = Column(
         Integer,
-        ForeignKey('store.id'),
+        ForeignKey('store.id', ondelete='RESTRICT'),
         nullable=False,
         comment='ID магазина',
     )

@@ -10,6 +10,7 @@ from app.cli.crud_commands import (
 )
 from app.crud import store_crud
 from app.models import Store
+from app.service.safe_delete import delete_store
 
 
 def register_store_commands(subparsers: argparse._SubParsersAction) -> None:
@@ -46,5 +47,6 @@ def register_store_commands(subparsers: argparse._SubParsersAction) -> None:
             columns=('id', 'name', 'description'),
             headers=('ID', 'Название', 'Описание'),
         ),
+        delete_fn=delete_store,
     )
     register_crud_commands(subparsers, spec)

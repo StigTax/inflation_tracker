@@ -1,0 +1,43 @@
+"22.01.2026 01:32:18 - [INFO] - wrapper: app.service.crud_service.create_item -> start (crud=<app.crud.stores.StoreCRUD object at 0x0000021BB971FF10>, obj_in=Store)"
+"22.01.2026 01:32:18 - [ERROR] - wrapper: app.service.crud_service.create_item -> error (1.8ms)"
+Traceback (most recent call last):
+  File "C:\PetProject\inflation_tracker\app\logging\decorators.py", line 266, in wrapper
+    result = func(*args, **kwargs)
+  File "C:\PetProject\inflation_tracker\app\service\crud_service.py", line 69, in create_item
+    exists = crud.exists_by_name_ci(
+TypeError: exists_by_name_ci() missing 1 required positional argument: 'field'
+"22.01.2026 01:32:41 - [INFO] - wrapper: app.service.crud_service.create_item -> start (crud=<app.crud.stores.StoreCRUD object at 0x00000256D582A6D0>, obj_in=Store)"
+"22.01.2026 01:32:41 - [ERROR] - wrapper: app.service.crud_service.create_item -> error (1.8ms)"
+Traceback (most recent call last):
+  File "C:\PetProject\inflation_tracker\app\logging\decorators.py", line 266, in wrapper
+    result = func(*args, **kwargs)
+  File "C:\PetProject\inflation_tracker\app\service\crud_service.py", line 69, in create_item
+    exists = crud.exists_by_name_ci(
+TypeError: exists_by_name_ci() missing 1 required positional argument: 'field'
+"22.01.2026 01:32:41 - [ERROR] - main: CLI command failed: entry=None, action=add"
+"22.01.2026 01:36:44 - [INFO] - wrapper: app.service.crud_service.create_item -> start (crud=<app.crud.stores.StoreCRUD object at 0x0000024F3C4DC6D0>, obj_in=Store)"
+"22.01.2026 01:36:44 - [ERROR] - wrapper: app.service.crud_service.create_item -> error (1.9ms)"
+Traceback (most recent call last):
+  File "C:\PetProject\inflation_tracker\app\logging\decorators.py", line 266, in wrapper
+    result = func(*args, **kwargs)
+  File "C:\PetProject\inflation_tracker\app\service\crud_service.py", line 70, in create_item
+    exists = crud.exists_by_name_ci(
+  File "C:\PetProject\inflation_tracker\app\crud\base.py", line 45, in exists_by_name_ci
+    target = normalize_name(value=name).casefold()
+TypeError: normalize_name() got an unexpected keyword argument 'value'
+"22.01.2026 01:36:44 - [ERROR] - main: CLI command failed: entry=None, action=add"
+"22.01.2026 01:37:47 - [INFO] - wrapper: app.service.crud_service.create_item -> start (crud=<app.crud.stores.StoreCRUD object at 0x0000023B06ACE880>, obj_in=Store)"
+"22.01.2026 01:37:47 - [ERROR] - wrapper: app.service.crud_service.create_item -> error (21.5ms)"
+Traceback (most recent call last):
+  File "C:\PetProject\inflation_tracker\app\logging\decorators.py", line 266, in wrapper
+    result = func(*args, **kwargs)
+  File "C:\PetProject\inflation_tracker\app\service\crud_service.py", line 75, in create_item
+    validate_unique_name(
+  File "C:\PetProject\inflation_tracker\app\validate\validators.py", line 68, in validate_unique_name
+    raise ValueError(f"Объект с именем '{value}' уже существует.")
+ValueError: Объект с именем 'Лента у дома' уже существует.
+"22.01.2026 01:37:47 - [ERROR] - main: CLI command failed: entry=None, action=add"
+"22.01.2026 01:49:33 - [DEBUG] - wrapper: app.service.purchases.list_purchases -> start (offset=0, limit=100, order_by=<sqlalchemy.orm.attributes.InstrumentedAttribute object at 0x000002C495F29220>)"
+"22.01.2026 01:49:33 - [DEBUG] - wrapper: app.service.purchases.list_purchases -> ok (49.2ms)"
+"22.01.2026 02:17:38 - [DEBUG] - wrapper: app.service.purchases.list_purchases -> start (offset=0, limit=100, order_by=<sqlalchemy.orm.attributes.InstrumentedAttribute object at 0x0000021EBD9752C0>)"
+"22.01.2026 02:17:38 - [DEBUG] - wrapper: app.service.purchases.list_purchases -> ok (41.7ms)"

@@ -11,6 +11,7 @@ from app.cli.crud_commands import (
 from app.crud import product_crud
 from app.models import Product
 from app.service.product import get_product
+from app.service.safe_delete import delete_product
 
 
 def register_product_commands(subparsers: argparse._SubParsersAction) -> None:
@@ -76,6 +77,7 @@ def register_product_commands(subparsers: argparse._SubParsersAction) -> None:
             ),
         ),
         get_fn=lambda obj_id: get_product(product_id=obj_id),
+        delete_fn=delete_product,
         refresh_after_write=True,
     )
     register_crud_commands(subparsers, spec)

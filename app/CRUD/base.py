@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any, Generic, Optional, Type, TypeVar
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.validate.validators import ensure_item_exists
+from app.validate.validators import ensure_item_exists, normalize_name
 
 ModelT = TypeVar('ModelT')
+logger = logging.getLogger(__name__)
 
 
 class CRUDBase(Generic[ModelT]):
@@ -17,6 +19,37 @@ class CRUDBase(Generic[ModelT]):
         model: Type[ModelT],
     ) -> None:
         self.model = model
+
+    def exists_by_name_ci(
+        self,
+        db,
+        field: str,
+        name: str,
+        exclude_id: Optional[int] = None
+    ) -> bool:
+        col = getattr(self.model, field, None)
+        if col is None:
+            logger.warning(
+                'В %s нет поля %s',
+                self.model.__name__,
+                field
+            )
+            raise AttributeError(
+                f"{self.model.__name__} has no field '{field}'"
+            )
+
+        stmt = select(self.model.id, col)
+        if exclude_id is not None:
+            stmt = stmt.where(self.model.id != exclude_id)
+
+        target = normalize_name(name).casefold()
+        for _id, existing in db.execute(stmt):
+            if isinstance(
+                existing,
+                str
+            ) and normalize_name(existing).casefold() == target:
+                return True
+        return False
 
     def get_or_raise(
         self,

@@ -50,7 +50,7 @@ def main():
     try:
         args.func(args)
     except Exception as e:
-        logger.exceprion(
+        logger.error(
             'CLI command failed: entry=%s, action=%s',
             getattr(args, 'entry', None),
             getattr(args, 'action', None),

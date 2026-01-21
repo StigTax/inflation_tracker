@@ -10,6 +10,7 @@ from app.logging import logged
 from app.models import Purchase
 from app.validate.validators import (
     validate_date_not_in_future,
+    validate_date_range,
     validate_positive_value,
 )
 
@@ -140,6 +141,7 @@ def get_purchase_by_product(
     to_date: Optional[date] = None,
     is_promo: Optional[bool] = None,
 ) -> list[Purchase]:
+    from_date, to_date = validate_date_range(from_date, to_date)
     with get_session() as db:
         return purchase_crud.get_purchase_by_product(
             db=db,
