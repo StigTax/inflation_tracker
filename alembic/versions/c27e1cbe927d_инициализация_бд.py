@@ -1,8 +1,8 @@
-"""Инициализация DB
+"""Инициализация БД
 
-Revision ID: 16269c5dd309
+Revision ID: c27e1cbe927d
 Revises: 
-Create Date: 2026-01-19 23:22:42.078806
+Create Date: 2026-01-22 03:02:27.913767
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '16269c5dd309'
+revision: str = 'c27e1cbe927d'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -54,13 +54,14 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('to_create', sa.DateTime(), nullable=False),
     sa.Column('to_update', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['category_id'], ['category.id'], ),
-    sa.ForeignKeyConstraint(['unit_id'], ['unit.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['category_id'], ['category.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['unit_id'], ['unit.id'], ondelete='RESTRICT'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('name')
     )
     op.create_table('purchase',
     sa.Column('product_id', sa.Integer(), nullable=False, comment='ID продукта'),
-    sa.Column('store_id', sa.Integer(), nullable=True, comment='ID магазина'),
+    sa.Column('store_id', sa.Integer(), nullable=False, comment='ID магазина'),
     sa.Column('purchase_date', sa.Date(), nullable=False, comment='Дата покупки'),
     sa.Column('quantity', sa.Numeric(precision=12, scale=3), nullable=False, comment='Количество купленного товара'),
     sa.Column('total_price', sa.Numeric(precision=12, scale=2), nullable=False, comment='Общая стоимость покупки'),
@@ -71,8 +72,8 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('to_create', sa.DateTime(), nullable=False),
     sa.Column('to_update', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['product_id'], ['product.id'], ),
-    sa.ForeignKeyConstraint(['store_id'], ['store.id'], ),
+    sa.ForeignKeyConstraint(['product_id'], ['product.id'], ondelete='RESTRICT'),
+    sa.ForeignKeyConstraint(['store_id'], ['store.id'], ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###

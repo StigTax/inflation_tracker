@@ -15,6 +15,7 @@ class Product(Base):
     name = Column(
         String(500),
         nullable=False,
+        unique=True,
         comment='Название продукта',
     )
     category_id = Column(
