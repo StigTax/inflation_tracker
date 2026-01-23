@@ -3,30 +3,19 @@ from __future__ import annotations
 import os
 import sys
 
-from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget
+from PyQt6.QtWidgets import QApplication, QMainWindow
 
 from app.core.db import init_db
-from app.gui.tabs.categories import CategoriesTab
-from app.gui.tabs.products import ProductsTab
-from app.gui.tabs.purchases import PurchasesTab
-from app.gui.tabs.stores import StoresTab
-from app.gui.tabs.units import UnitsTab
+from app.gui.analytics import AnalyticsWidget
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('Inflation Tracker')
-        self.resize(1000, 650)
+        self.setWindowTitle("Inflation Tracker")
+        self.resize(1100, 700)
 
-        tabs = QTabWidget()
-        tabs.addTab(StoresTab(), 'Магазины')
-        tabs.addTab(CategoriesTab(), 'Категории')
-        tabs.addTab(UnitsTab(), 'Единицы измерения')
-        tabs.addTab(ProductsTab(), "Продукты")
-        tabs.addTab(PurchasesTab(), 'Покупки')
-
-        self.setCentralWidget(tabs)
+        self.setCentralWidget(AnalyticsWidget())
 
 
 def main() -> None:
@@ -36,6 +25,6 @@ def main() -> None:
     sys.exit(app.exec())
 
 
-if __name__ == '__main__':
-    init_db(os.getenv('DB_URL', 'sqlite+pysqlite:///./inflation.db'))
+if __name__ == "__main__":
+    init_db(os.getenv("DB_URL", "sqlite+pysqlite:///./inflation.db"))
     main()

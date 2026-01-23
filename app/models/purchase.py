@@ -56,7 +56,7 @@ class Purchase(Base):
         Boolean,
         nullable=False,
         default=False,
-        server_default="0",
+        server_default='0',
         comment='Товар по акции или нет.'
     )
     promo_type = Column(
@@ -80,13 +80,13 @@ class Purchase(Base):
 
     @property
     def unit_price(self) -> Decimal:
-        """Цена за единицу — вычисляемая, чтобы не было рассинхрона."""
+        '''Цена за единицу — вычисляемая, чтобы не было рассинхрона.'''
         if not self.quantity:
-            return Decimal("0")
+            return Decimal('0')
         # total_price/quantity уже Decimal (из Numeric)
         return (
             Decimal(self.total_price) / Decimal(self.quantity)
-        ).quantize(Decimal("0.01"))
+        ).quantize(Decimal('0.01'))
 
     @property
     def effective_regular_unit_price(self) -> Decimal:
@@ -98,15 +98,15 @@ class Purchase(Base):
             )
         return self.unit_price
 
-    @validates("quantity", "total_price")
+    @validates('quantity', 'total_price')
     def _validate_non_negative(self, key, value):
         if value is None:
             return value
         if Decimal(value) < 0:
-            raise ValueError(f"{key} не может быть отрицательным")
+            raise ValueError(f'{key} не может быть отрицательным')
         return value
 
-    @validates("is_promo")
+    @validates('is_promo')
     def _validate_is_promo(self, key, value):
         if not value:
             self.promo_type = None

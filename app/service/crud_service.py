@@ -21,7 +21,7 @@ DeleteGuard = Callable[[Session, int], None]
 def _column_unique(model: type, field: str) -> bool:
     try:
         col = getattr(model, field).property.columns[0]
-        return bool(getattr(col, "unique", False))
+        return bool(getattr(col, 'unique', False))
     except Exception:
         return False
 
@@ -167,5 +167,5 @@ def delete_item(
             )
     except IntegrityError as e:
         raise ObjectInUseError(
-            "Нельзя удалить объект: он используется в связанных записях."
+            'Нельзя удалить объект: он используется в связанных записях.'
         ) from e

@@ -35,7 +35,7 @@ class CRUDBase(Generic[ModelT]):
                 field
             )
             raise AttributeError(
-                f"{self.model.__name__} has no field '{field}'"
+                f'{self.model.__name__} has no field "{field}"'
             )
 
         stmt = select(self.model.id, col)

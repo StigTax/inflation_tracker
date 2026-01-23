@@ -27,7 +27,7 @@ class Category(Base):
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id,
-            "name": self.name,
-            "description": self.description,
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
         }

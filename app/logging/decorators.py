@@ -30,7 +30,7 @@ def _is_model(
 
 
 def _repr_none(value: Any) -> str | object:
-    return "None" if value is None else UNHANDLED
+    return 'None' if value is None else UNHANDLED
 
 
 def _repr_scalar(value: Any, *, maxlen: int) -> str | object:
@@ -54,7 +54,7 @@ def _repr_namespace(
     map_limit: int,
 ) -> str | object:
     # argparse.Namespace
-    if value.__class__.__name__ == "Namespace" and hasattr(value, "__dict__"):
+    if value.__class__.__name__ == 'Namespace' and hasattr(value, '__dict__'):
         return _safe_repr(
             vars(value),
             maxlen=maxlen,
@@ -66,9 +66,9 @@ def _repr_namespace(
 
 def _repr_model(value: Any) -> str | object:
     if _is_model(value):
-        obj_id = getattr(value, "id", None)
+        obj_id = getattr(value, 'id', None)
         cls = value.__class__.__name__
-        return f"{cls}(id={obj_id})" if obj_id is not None else cls
+        return f'{cls}(id={obj_id})' if obj_id is not None else cls
     return UNHANDLED
 
 
@@ -85,13 +85,13 @@ def _repr_mapping(
     parts: list[str] = []
     for i, (k, v) in enumerate(value.items()):
         if i >= m_lim:
-            parts.append(f"...+{len(value) - m_lim} keys")
+            parts.append(f'...+{len(value) - m_lim} keys')
             break
         parts.append(
-            f"{_safe_repr(k, maxlen=40, seq_limit=s_lim, map_limit=m_lim)}: "
-            f"{_safe_repr(v, maxlen=80, seq_limit=s_lim, map_limit=m_lim)}"
+            f'{_safe_repr(k, maxlen=40, seq_limit=s_lim, map_limit=m_lim)}: '
+            f'{_safe_repr(v, maxlen=80, seq_limit=s_lim, map_limit=m_lim)}'
         )
-    return _truncate("{" + ", ".join(parts) + "}", maxlen)
+    return _truncate('{' + ', '.join(parts) + '}', maxlen)
 
 
 def _repr_sequence(
@@ -109,23 +109,23 @@ def _repr_sequence(
         _safe_repr(v, maxlen=80, seq_limit=seq_limit, map_limit=map_limit)
         for v in seq[:seq_limit]
     ]
-    suffix = f", ...+{len(seq) - seq_limit}" if len(seq) > seq_limit else ""
+    suffix = f', ...+{len(seq) - seq_limit}' if len(seq) > seq_limit else ''
 
     if isinstance(value, list):
-        opener, closer = "[", "]"
+        opener, closer = '[', ']'
     elif isinstance(value, tuple):
-        opener, closer = "(", ")"
+        opener, closer = '(', ')'
     else:
-        opener, closer = "{", "}"
+        opener, closer = '{', '}'
 
-    return _truncate(opener + ", ".join(shown) + suffix + closer, maxlen)
+    return _truncate(opener + ', '.join(shown) + suffix + closer, maxlen)
 
 
 def _repr_fallback(value: Any, *, maxlen: int) -> str:
     try:
         return _truncate(repr(value), maxlen)
     except Exception:  # pragma: no cover
-        return f"<unreprable {type(value).__name__}>"
+        return f'<unreprable {type(value).__name__}>'
 
 
 def _safe_repr(
@@ -169,7 +169,7 @@ def _safe_repr(
 def _is_empty_value(val: Any) -> bool:
     return (
         val is None
-        or (isinstance(val, str) and val == "")
+        or (isinstance(val, str) and val == '')
         or (isinstance(
             val,
             (
@@ -228,12 +228,12 @@ def logged(
     skip_none: bool = True,
     skip_empty: bool = False,
 ) -> Callable[[F], F]:
-    """Декоратор для логирования вызова функции.
+    '''Декоратор для логирования вызова функции.
 
     Пишет: start/ok/error и время выполнения.
     Аргументы/результат форматируются безопасно: с ограничением длины и без
     тяжёлых сериализаций ORM.
-    """
+    '''
 
     def decorator(func: F) -> F:
         log = logger or logging.getLogger(func.__module__)

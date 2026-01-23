@@ -41,13 +41,13 @@ def _create(
 
 def _update(args: argparse.Namespace) -> Purchase:
     if args.promo and args.no_promo:
-        raise ValueError("Нельзя одновременно --promo и --no-promo")
+        raise ValueError('Нельзя одновременно --promo и --no-promo')
 
     if args.no_promo and (
         args.promo_type is not None or args.regular_unit_price is not None
     ):
         raise ValueError(
-            "С --no-promo нельзя передавать --promo-type/--regular-unit-price"
+            'С --no-promo нельзя передавать --promo-type/--regular-unit-price'
         )
 
     is_promo = None
@@ -73,7 +73,7 @@ def _update(args: argparse.Namespace) -> Purchase:
 def _list(args: argparse.Namespace) -> list[Purchase]:
     promo_filter = None
     if args.promo_only and args.no_promo_only:
-        raise ValueError("Нельзя одновременно --promo-only и --no-promo-only")
+        raise ValueError('Нельзя одновременно --promo-only и --no-promo-only')
     if args.promo_only:
         promo_filter = True
     if args.no_promo_only:

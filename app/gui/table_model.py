@@ -51,7 +51,7 @@ class DictTableModel(QAbstractTableModel):
         row = self._rows[index.row()]
         key = self._columns[index.column()][0]
         val = row.get(key)
-        return "" if val is None else str(val)
+        return '' if val is None else str(val)
 
     def headerData(
         self,

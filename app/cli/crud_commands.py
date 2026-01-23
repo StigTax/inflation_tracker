@@ -18,7 +18,7 @@ from app.service.crud_service import (
     update_item,
 )
 
-ModelT = TypeVar("ModelT")
+ModelT = TypeVar('ModelT')
 
 
 @dataclass(frozen=True)
@@ -132,8 +132,8 @@ def register_crud_commands(
         upd.add_argument(*upd_arg.args, **dict(upd_arg.kwargs))
     upd.set_defaults(func=_make_cmd_update(spec))
 
-    rm = subpars.add_parser("delete", help=f"Удалить {spec.command}")
-    rm.add_argument("id", type=int)
+    rm = subpars.add_parser('delete', help=f'Удалить {spec.command}')
+    rm.add_argument('id', type=int)
     rm.set_defaults(func=_make_cmd_delete(spec))
 
 
@@ -235,6 +235,6 @@ def _make_cmd_delete(spec: CrudCommandSpec):
             spec.delete_fn(args.id)
         else:
             delete_item(crud=spec.crud, item_id=args.id)
-        print(f"OK deleted id={args.id}")
+        print(f'OK deleted id={args.id}')
 
     return cmd

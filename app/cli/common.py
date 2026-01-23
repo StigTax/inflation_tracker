@@ -61,10 +61,10 @@ def print_table(
 
 
 def print_item(obj: Any) -> None:
-    data = obj.to_dict() if hasattr(obj, "to_dict") else obj
+    data = obj.to_dict() if hasattr(obj, 'to_dict') else obj
     if isinstance(data, dict):
         for k, v in data.items():
-            print(f"{k}: {v}")
+            print(f'{k}: {v}')
     else:
         print(data)
 

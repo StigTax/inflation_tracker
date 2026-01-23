@@ -37,80 +37,80 @@ def product_inflation_index(
     if df.empty:
         return {'points': [], 'kpi': None}
 
-    df["purchase_date"] = pd.to_datetime(df["purchase_date"])
-    df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce")
-    df["total_price"] = pd.to_numeric(df["total_price"], errors="coerce")
-    df["unit_price"] = pd.to_numeric(df["unit_price"], errors="coerce")
-    df["regular_unit_price"] = pd.to_numeric(
-        df["regular_unit_price"], errors="coerce"
+    df['purchase_date'] = pd.to_datetime(df['purchase_date'])
+    df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')
+    df['total_price'] = pd.to_numeric(df['total_price'], errors='coerce')
+    df['unit_price'] = pd.to_numeric(df['unit_price'], errors='coerce')
+    df['regular_unit_price'] = pd.to_numeric(
+        df['regular_unit_price'], errors='coerce'
     )
 
-    promo_mask = df["is_promo"].fillna(False).astype(bool)
+    promo_mask = df['is_promo'].fillna(False).astype(bool)
 
-    if promo_mode == "exclude":
+    if promo_mode == 'exclude':
         df = df[~promo_mask]
-    elif promo_mode == "only":
+    elif promo_mode == 'only':
         df = df[promo_mask]
 
     if df.empty:
-        return {"points": [], "kpi": None}
+        return {'points': [], 'kpi': None}
 
     period = _GROUP_TO_PERIOD[group_by]
-    df["period"] = df["purchase_date"].dt.to_period(period).dt.start_time
+    df['period'] = df['purchase_date'].dt.to_period(period).dt.start_time
 
-    if price_mode == "paid":
-        df["effective_total"] = df["total_price"]
+    if price_mode == 'paid':
+        df['effective_total'] = df['total_price']
     else:
-        eff_unit = df["regular_unit_price"].fillna(df["unit_price"])
-        df["effective_total"] = eff_unit * df["quantity"]
+        eff_unit = df['regular_unit_price'].fillna(df['unit_price'])
+        df['effective_total'] = eff_unit * df['quantity']
 
     agg = (
-        df.groupby("period", as_index=False)
+        df.groupby('period', as_index=False)
         .agg(
-            total=("effective_total", "sum"),
-            qty=("quantity", "sum"),
-            n=("id", "count"),
+            total=('effective_total', 'sum'),
+            qty=('quantity', 'sum'),
+            n=('id', 'count'),
         )
     )
 
-    agg["avg_unit_price"] = agg["total"] / agg["qty"]
-    agg = agg.sort_values("period")
+    agg['avg_unit_price'] = agg['total'] / agg['qty']
+    agg = agg.sort_values('period')
 
-    base_price = float(agg["avg_unit_price"].iloc[0])
-    agg["index"] = agg["avg_unit_price"] / base_price
-    agg["index_100"] = agg["index"] * 100.0
-    agg["inflation_pct_from_base"] = (agg["index"] - 1.0) * 100.0
+    base_price = float(agg['avg_unit_price'].iloc[0])
+    agg['index'] = agg['avg_unit_price'] / base_price
+    agg['index_100'] = agg['index'] * 100.0
+    agg['inflation_pct_from_base'] = (agg['index'] - 1.0) * 100.0
 
     last = agg.iloc[-1]
     prev = agg.iloc[-2] if len(agg) >= 2 else None
     mom_pct = None
-    if prev is not None and float(prev["avg_unit_price"]) != 0:
+    if prev is not None and float(prev['avg_unit_price']) != 0:
         mom_pct = (float(
-            last["avg_unit_price"]
+            last['avg_unit_price']
         ) / float(
-            prev["avg_unit_price"]
+            prev['avg_unit_price']
         ) - 1.0) * 100.0
 
     kpi = {
-        "base_period": agg["period"].iloc[0].date().isoformat(),
-        "base_price": base_price,
-        "last_period": last["period"].date().isoformat(),
-        "last_avg_unit_price": float(last["avg_unit_price"]),
-        "last_index_100": float(last["index_100"]),
-        "change_vs_prev_period_pct": mom_pct,
-        "last_n": int(last["n"]),
+        'base_period': agg['period'].iloc[0].date().isoformat(),
+        'base_price': base_price,
+        'last_period': last['period'].date().isoformat(),
+        'last_avg_unit_price': float(last['avg_unit_price']),
+        'last_index_100': float(last['index_100']),
+        'change_vs_prev_period_pct': mom_pct,
+        'last_n': int(last['n']),
     }
 
     points = agg[
         [
-            "period",
-            "avg_unit_price",
-            "index_100",
-            "inflation_pct_from_base",
-            "n"
+            'period',
+            'avg_unit_price',
+            'index_100',
+            'inflation_pct_from_base',
+            'n'
         ]
-    ].to_dict("records")
+    ].to_dict('records')
     for p in points:
-        p["period"] = p["period"].date().isoformat()
+        p['period'] = p['period'].date().isoformat()
 
     return {'points': points, 'kpi': kpi}
