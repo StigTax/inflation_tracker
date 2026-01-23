@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import cast
+from typing import Optional, cast
 
 from PyQt6.QtCore import QDate
 from PyQt6.QtWidgets import (
@@ -52,15 +52,15 @@ class PurchaseDialog(QDialog):
         self,
         parent=None,
         *,
-        purchase_date: date | None = None,
-        product_id: int | None = None,
-        store_id: int | None = None,
-        quantity: float | None = None,
-        total_price: float | None = None,
-        comment: str | None = None,
+        purchase_date: Optional[date] = None,
+        product_id: Optional[int]  = None,
+        store_id: Optional[int]  = None,
+        quantity: Optional[float]  = None,
+        total_price: Optional[float] = None,
+        comment: Optional[str] = None,
         is_promo: bool = False,
-        promo_type: str | None = None,
-        regular_unit_price: float | None = None,
+        promo_type: Optional[str] = None,
+        regular_unit_price: Optional[float] = None,
     ):
         super().__init__(parent)
         self.setWindowTitle('Покупка')

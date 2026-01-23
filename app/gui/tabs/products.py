@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -40,8 +42,8 @@ class ProductDialog(QDialog):
         parent=None,
         *,
         name: str = '',
-        category_id: int | None = None,
-        unit_id: int | None = None,
+        category_id: Optional[int] = None,
+        unit_id: Optional[int] = None,
     ):
         super().__init__(parent)
         self.setWindowTitle('Продукт')

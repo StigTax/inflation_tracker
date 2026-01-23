@@ -10,6 +10,8 @@ dependencies = [
     "sqlalchemy>=2.0.45",
     "prettytable>=3.10.0",
     "python-dotenv>=1.0.0",
+    "pandas=2.3.3",
+    "matplotlib=3.9.4"
 ]
 
 [project.optional-dependencies]
