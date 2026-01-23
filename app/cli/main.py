@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
 
 from app.cli import categories, products, purchases, stores, units
 from app.cli.common import configure_db
 from app.core.config_log import configure_logging
 
 logger = logging.getLogger(__name__)
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
