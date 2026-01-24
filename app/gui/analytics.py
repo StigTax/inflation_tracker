@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Optional
 
 import pandas as pd
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -13,6 +14,7 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QPushButton,
     QSplitter,
@@ -20,15 +22,16 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from app.crud import product_crud
+from app.crud import category_crud, product_crud, store_crud
 from app.gui.data_manager import DataManagerDialog
+from app.service import analytics as svc
 from app.service.crud_service import list_items
-from app.service.purchases import get_purchase_by_product
 
 _GROUP_FREQ = {
-    "День": "D",
-    "Неделя": "W-MON",
-    "Месяц": "MS",
+    "День": "day",
+    "Неделя": "week",
+    "Месяц": "month",
+    "Год": "year",
 }
 
 
@@ -37,8 +40,8 @@ class AnalyticsWidget(QWidget):
         super().__init__(parent)
 
         # --- Верхняя панель (кнопки) ---
-        self.btn_data = QPushButton('Данные…')
-        self.btn_build = QPushButton('Построить')
+        self.btn_data = QPushButton("Данные…")
+        self.btn_build = QPushButton("Построить")
 
         self.btn_data.clicked.connect(self.open_data_manager)
         self.btn_build.clicked.connect(self.build)
@@ -49,9 +52,37 @@ class AnalyticsWidget(QWidget):
         top.addWidget(self.btn_build)
 
         # --- Левая панель параметров ---
-        self.product_combo = QComboBox()
+        self.kind_combo = QComboBox()
+        self.kind_combo.addItem("Продукт: индекс", "product_index")
+        self.kind_combo.addItem("Категория: индекс", "category_index")
+        self.kind_combo.addItem("Магазин: индекс", "store_index")
+        self.kind_combo.addItem("Моя инфляция: корзина", "basket_index")
+        self.kind_combo.addItem("Вклад в инфляцию (top)", "contrib")
+        self.kind_combo.addItem("Где дешевле продукт", "cheapest")
 
-        self.use_dates = QCheckBox('Фильтр по датам')
+        self.product_combo = QComboBox()
+        self.category_combo = QComboBox()
+        self.store_combo = QComboBox()
+
+        # ids — только для store_index (ограничить корзину магазина)
+        self.product_ids_edit = QLineEdit()
+        self.product_ids_edit.setPlaceholderText(
+            "id продуктов через запятую, напр. 1,2,3"
+            "(только для 'Магазин: индекс')"
+        )
+
+        self.contrib_by = QComboBox()
+        self.contrib_by.addItem("По продуктам", "product")
+        self.contrib_by.addItem("По категориям", "category")
+
+        # Top 10/20 (не SpinBox)
+        self.contrib_top = QComboBox()
+        self.contrib_top.addItem("Top 10", 10)
+        self.contrib_top.addItem("Top 20", 20)
+
+        self.kind_combo.currentIndexChanged.connect(self._toggle_kind_fields)
+
+        self.use_dates = QCheckBox("Фильтр по датам")
         self.date_from = QDateEdit()
         self.date_to = QDateEdit()
         self.date_from.setCalendarPopup(True)
@@ -65,26 +96,36 @@ class AnalyticsWidget(QWidget):
         self.use_dates.stateChanged.connect(self._toggle_dates)
 
         self.group_combo = QComboBox()
-        for k in _GROUP_FREQ:
-            self.group_combo.addItem(k, _GROUP_FREQ[k])
+        for k, v in _GROUP_FREQ.items():
+            self.group_combo.addItem(k, v)
 
         self.price_mode = QComboBox()
-        self.price_mode.addItem('Как заплатил (paid)', 'paid')
-        self.price_mode.addItem('Обычная цена (regular)', 'regular')
+        self.price_mode.addItem("Как заплатил (paid)", "paid")
+        self.price_mode.addItem("Обычная цена (regular)", "regular")
 
         self.promo_mode = QComboBox()
-        self.promo_mode.addItem('Включая акции', 'include')
-        self.promo_mode.addItem('Без акций', 'exclude')
-        self.promo_mode.addItem('Только акции', 'only')
+        self.promo_mode.addItem("Включая акции", "include")
+        self.promo_mode.addItem("Без акций", "exclude")
+        self.promo_mode.addItem("Только акции", "only")
 
         left_form = QFormLayout()
-        left_form.addRow('Продукт:', self.product_combo)
-        left_form.addRow('', self.use_dates)
-        left_form.addRow('с:', self.date_from)
-        left_form.addRow('по:', self.date_to)
-        left_form.addRow('Группировка:', self.group_combo)
-        left_form.addRow('Режим цены:', self.price_mode)
-        left_form.addRow('Акции:', self.promo_mode)
+
+        # Сначала "что строим"
+        left_form.addRow("Тип:", self.kind_combo)
+        left_form.addRow("Продукт:", self.product_combo)
+        left_form.addRow("Категория:", self.category_combo)
+        left_form.addRow("Магазин:", self.store_combo)
+        left_form.addRow("Корзина (ids):", self.product_ids_edit)
+        left_form.addRow("Вклад:", self.contrib_by)
+        left_form.addRow("Top:", self.contrib_top)
+
+        # Потом общие фильтры
+        left_form.addRow("", self.use_dates)
+        left_form.addRow("с:", self.date_from)
+        left_form.addRow("по:", self.date_to)
+        left_form.addRow("Группировка:", self.group_combo)
+        left_form.addRow("Режим цены:", self.price_mode)
+        left_form.addRow("Акции:", self.promo_mode)
 
         left = QWidget()
         left.setLayout(left_form)
@@ -94,7 +135,7 @@ class AnalyticsWidget(QWidget):
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
 
-        self.kpi = QLabel('Выбери параметры и нажми «Построить».')
+        self.kpi = QLabel("Выбери параметры и нажми «Построить».")
         self.kpi.setWordWrap(True)
 
         right = QVBoxLayout()
@@ -117,30 +158,130 @@ class AnalyticsWidget(QWidget):
         self.setLayout(root)
 
         self.reload_products()
+        self.reload_categories()
+        self.reload_stores()
+        self._toggle_kind_fields()
 
+    # -------------------------
+    # UI helpers
+    # -------------------------
     def _toggle_dates(self) -> None:
         enabled = self.use_dates.isChecked()
         self.date_from.setEnabled(enabled)
         self.date_to.setEnabled(enabled)
 
+    def _set_combo_data(self, combo: QComboBox, value: str) -> None:
+        idx = combo.findData(value)
+        if idx >= 0:
+            combo.setCurrentIndex(idx)
+
+    def _reset_unused_fields(
+        self,
+        *,
+        need_product: bool,
+        need_category: bool,
+        need_store: bool,
+        need_ids: bool,
+        need_contrib: bool,
+    ) -> None:
+        if not need_product:
+            self.product_combo.setCurrentIndex(0)
+        if not need_category:
+            self.category_combo.setCurrentIndex(0)
+        if not need_store:
+            self.store_combo.setCurrentIndex(0)
+        if not need_ids:
+            self.product_ids_edit.clear()
+        if not need_contrib:
+            self.contrib_by.setCurrentIndex(0)
+            self.contrib_top.setCurrentIndex(0)
+
+    def _toggle_kind_fields(self) -> None:
+        kind = self.kind_combo.currentData()
+
+        need_product = kind in {"product_index", "cheapest"}
+        need_category = kind == "category_index"
+        need_store = kind == "store_index"
+        need_ids = kind == "store_index"
+        need_contrib = kind == "contrib"
+
+        # Сброс неиспользуемых полей на дефолт
+        self._reset_unused_fields(
+            need_product=need_product,
+            need_category=need_category,
+            need_store=need_store,
+            need_ids=need_ids,
+            need_contrib=need_contrib,
+        )
+
+        # Enable/Disable
+        self.product_combo.setEnabled(need_product)
+        self.category_combo.setEnabled(need_category)
+        self.store_combo.setEnabled(need_store)
+        self.product_ids_edit.setEnabled(need_ids)
+
+        self.contrib_by.setEnabled(need_contrib)
+        self.contrib_top.setEnabled(need_contrib)
+
+        if kind == "cheapest" or kind == "basket_index":
+            self.group_combo.setEnabled(False)
+            self._set_combo_data(self.group_combo, "month")
+        else:
+            self.group_combo.setEnabled(True)
+
+    # -------------------------
+    # Reload data (with counts)
+    # -------------------------
     def reload_products(self) -> None:
         self.product_combo.clear()
-        self.product_combo.addItem('— выбери продукт —', None)
+        self.product_combo.addItem("— выбери продукт —", None)
+
+        counts = svc.purchase_counts(by="product")
         products = list_items(product_crud, limit=5000)
         for p in products:
-            unit = f'{p.unit.measure_type} {p.unit.unit}' if p.unit else ''
-            self.product_combo.addItem(f'{p.name} ({unit}) (id={p.id})', p.id)
+            unit = f"{p.unit.measure_type} {p.unit.unit}" if getattr(
+                p, "unit", None
+            ) else ""
+            n = counts.get(int(p.id), 0)
+            self.product_combo.addItem(
+                f"{p.name} ({unit}) (покупок: {n})", p.id
+            )
+
+    def reload_categories(self) -> None:
+        self.category_combo.clear()
+        self.category_combo.addItem("— выбери категорию —", None)
+
+        counts = svc.purchase_counts(by="category")
+        cats = list_items(category_crud, limit=5000)
+        for c in cats:
+            n = counts.get(int(c.id), 0)
+            self.category_combo.addItem(f"{c.name} (покупок: {n})", c.id)
+
+    def reload_stores(self) -> None:
+        self.store_combo.clear()
+        self.store_combo.addItem("— выбери магазин —", None)
+
+        counts = svc.purchase_counts(by="store")
+        stores = list_items(store_crud, limit=5000)
+        for s in stores:
+            n = counts.get(int(s.id), 0)
+            self.store_combo.addItem(f"{s.name} (покупок: {n})", s.id)
 
     def open_data_manager(self) -> None:
         dlg = DataManagerDialog(self)
         dlg.exec()
-
         self.reload_products()
+        self.reload_categories()
+        self.reload_stores()
+        self._toggle_kind_fields()
 
+    # -------------------------
+    # Build
+    # -------------------------
     def build(self) -> None:
-        product_id = self.product_combo.currentData()
-        if product_id is None:
-            QMessageBox.information(self, 'Ок', 'Сначала выбери продукт.')
+        kind = self.kind_combo.currentData()
+        if not kind:
+            QMessageBox.information(self, "Ок", "Выбери тип аналитики.")
             return
 
         from_date = None
@@ -148,102 +289,311 @@ class AnalyticsWidget(QWidget):
         if self.use_dates.isChecked():
             from_date = self.date_from.date().toPyDate()
             to_date = self.date_to.date().toPyDate()
+            if from_date and to_date and from_date > to_date:
+                QMessageBox.information(
+                    self, "Ок", "Дата 'с' не может быть позже даты 'по'."
+                )
+                return
 
-        promo_mode = self.promo_mode.currentData()
-        is_promo = None
-        if promo_mode == 'exclude':
-            is_promo = False
-        elif promo_mode == 'only':
-            is_promo = True
+        group_by = self.group_combo.currentData() or "month"
+        price_mode = self.price_mode.currentData() or "paid"
+        promo_mode = self.promo_mode.currentData() or "include"
 
-        price_mode = self.price_mode.currentData()
-        freq = self.group_combo.currentData()
+        # Корзина всегда по месяцам (мониторинг скачков)
+        if kind == "basket_index":
+            group_by = "month"
 
-        purchases = get_purchase_by_product(
-            product_id=product_id,
-            from_date=from_date,
-            to_date=to_date,
-            is_promo=is_promo,
-        )
+        # ids теперь нужны только для store_index
+        product_ids = None
+        if kind == "store_index":
+            try:
+                product_ids = self._parse_ids()
+            except ValueError as e:
+                QMessageBox.information(self, "Ошибка", str(e))
+                return
 
-        if not purchases:
+        try:
+            if kind == "product_index":
+                product_id = self.product_combo.currentData()
+                if product_id is None:
+                    QMessageBox.information(
+                        self, "Ок", "Сначала выбери продукт."
+                    )
+                    return
+
+                res = svc.product_inflation_index(
+                    product_id=int(product_id),
+                    from_date=from_date,
+                    to_date=to_date,
+                    group_by=group_by,
+                    price_mode=price_mode,
+                    promo_mode=promo_mode,
+                )
+                self._plot_index(
+                    res,
+                    title="Индекс по продукту (база=100)",
+                    group_by=group_by
+                )
+
+            elif kind == "category_index":
+                category_id = self.category_combo.currentData()
+                if category_id is None:
+                    QMessageBox.information(
+                        self, "Ок", "Сначала выбери категорию."
+                    )
+                    return
+
+                res = svc.category_inflation_index(
+                    category_id=int(category_id),
+                    from_date=from_date,
+                    to_date=to_date,
+                    group_by=group_by,
+                    price_mode=price_mode,
+                    promo_mode=promo_mode,
+                )
+                self._plot_index(
+                    res,
+                    title="Индекс по категории (база=100)",
+                    group_by=group_by
+                )
+
+            elif kind == "store_index":
+                store_id = self.store_combo.currentData()
+                if store_id is None:
+                    QMessageBox.information(
+                        self, "Ок", "Сначала выбери магазин."
+                    )
+                    return
+
+                res = svc.store_inflation_index(
+                    store_id=int(store_id),
+                    from_date=from_date,
+                    to_date=to_date,
+                    product_ids=product_ids,
+                    group_by=group_by,
+                    price_mode=price_mode,
+                    promo_mode=promo_mode,
+                )
+                self._plot_index(
+                    res,
+                    title="Индекс по магазину (база=100)",
+                    group_by=group_by
+                )
+
+            elif kind == "basket_index":
+                res = svc.basket_inflation_index(
+                    from_date=from_date,
+                    to_date=to_date,
+                    product_ids=None,
+                    group_by="month",
+                    price_mode=price_mode,
+                    promo_mode=promo_mode,
+                )
+                self._plot_index(
+                    res,
+                    title="Моя инфляция (корзина, база=100)",
+                    group_by=group_by
+                )
+
+            elif kind == "contrib":
+                # Никаких ids — только top 10/20
+                top_n = int(self.contrib_top.currentData() or 10)
+
+                res = svc.inflation_contributions(
+                    by=self.contrib_by.currentData() or "product",
+                    from_date=from_date,
+                    to_date=to_date,
+                    product_ids=None,
+                    group_by=group_by,
+                    price_mode=price_mode,
+                    promo_mode=promo_mode,
+                    top=top_n,
+                )
+                self._plot_contrib(
+                    res, title=f"Вклад в инфляцию (Top {top_n})"
+                )
+
+            elif kind == "cheapest":
+                product_id = self.product_combo.currentData()
+                if product_id is None:
+                    QMessageBox.information(
+                        self, "Ок", "Сначала выбери продукт."
+                    )
+                    return
+
+                res = svc.product_store_price_stats(
+                    product_id=int(product_id),
+                    from_date=from_date,
+                    to_date=to_date,
+                    price_mode=price_mode,
+                    promo_mode=promo_mode,
+                )
+                self._plot_cheapest(res, title="Средняя цена по магазинам")
+
+            else:
+                QMessageBox.information(
+                    self, "Ок", f"Неизвестный тип аналитики: {kind}"
+                )
+                return
+
+        except Exception as e:
             self.ax.clear()
             self.canvas.draw()
-            self.kpi.setText('Нет данных под выбранные фильтры.')
+            self.kpi.setText("Ошибка при построении.")
+            QMessageBox.critical(self, "Ошибка", str(e))
             return
 
-        df = pd.DataFrame([p.to_dict() for p in purchases])
-        df['purchase_date'] = pd.to_datetime(df['purchase_date'])
-        df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')
-        df['total_price'] = pd.to_numeric(df['total_price'], errors='coerce')
-        df['unit_price'] = pd.to_numeric(df['unit_price'], errors='coerce')
-        df['regular_unit_price'] = pd.to_numeric(
-            df['regular_unit_price'],
-            errors='coerce'
-        )
+    # -------------------------
+    # Parsers
+    # -------------------------
+    def _parse_ids(self) -> Optional[list[int]]:
+        raw = (self.product_ids_edit.text() or "").strip()
+        if not raw:
+            return None
+        parts = [p.strip() for p in raw.split(",") if p.strip()]
+        ids: list[int] = []
+        for p in parts:
+            if not p.isdigit():
+                raise ValueError(f"Некорректный id: {p}")
+            ids.append(int(p))
+        return ids or None
 
-        if price_mode == 'paid':
-            df['effective_total'] = df['total_price']
+    # -------------------------
+    # Plotters
+    # -------------------------
+    def _plot_index(self, res: dict, *, title: str, group_by: str) -> None:
+        points = res.get("points") or []
+        kpi = res.get("kpi")
+
+        self.ax.clear()
+
+        if not points:
+            self.canvas.draw()
+            self.kpi.setText("Нет данных под выбранные фильтры.")
+            return
+
+        # собираем x/y безопасно
+        xs: list[str] = []
+        ys: list[float] = []
+        for p in points:
+            val = p.get("index_100")
+            if val is None:
+                val = p.get("index")
+            if val is None:
+                continue
+            xs.append(str(p.get("period")))
+            ys.append(float(val))
+
+        if not xs:
+            self.canvas.draw()
+            self.kpi.setText("Нет данных под выбранные фильтры.")
+            return
+
+        x = pd.Series(pd.to_datetime(xs, errors="coerce"))
+        mask = x.notna()
+        x = x[mask]
+        ys = [y for y, ok in zip(ys, mask.to_list()) if ok]
+
+        if x.empty:
+            self.canvas.draw()
+            self.kpi.setText("Нет данных под выбранные фильтры.")
+            return
+
+        # сортируем по времени (чтобы линия не прыгала)
+        dfp = pd.DataFrame({"x": x, "y": ys}).sort_values("x")
+        x_dt = pd.to_datetime(dfp["x"]).to_list()
+        y = dfp["y"].to_list()
+
+        # рисуем
+        self.ax.axhline(100, linestyle="--", linewidth=1)
+        self.ax.plot(x_dt, y, marker="o")
+        self.ax.set_title(title)
+        self.ax.set_ylabel("Индекс")
+        self.ax.grid(True)
+
+        # KPI (добавим полезную диагностику)
+        if isinstance(kpi, dict):
+            extra = [f"Точек: {len(dfp)}"]
+            if "coverage_last" in kpi:
+                extra.append(
+                    f'Покрытие (последний период): {kpi["coverage_last"]:.2f}'
+                )
+            if "inflation_total" in kpi and kpi["inflation_total"] is not None:
+                extra.append(
+                    f'Инфляция от базы: {kpi["inflation_total"]:.2f} п.п.'
+                )
+            self.kpi.setText("\n".join(extra))
         else:
-            eff_unit = df['regular_unit_price'].fillna(df['unit_price'])
-            df['effective_total'] = eff_unit * df['quantity']
+            self.kpi.setText(f"Готово. Точек: {len(dfp)}")
 
-        df = df.set_index('purchase_date').sort_index()
+    def _plot_contrib(self, res: dict, *, title: str) -> None:
+        points = res.get("points") or []
+        kpi = res.get("kpi")
 
-        agg = df.resample(freq).agg(
-            total=('effective_total', 'sum'),
-            qty=('quantity', 'sum'),
-            n=('id', 'count'),
-        )
-        agg['avg_unit_price'] = agg['total'] / agg['qty']
-        agg = agg.dropna(subset=['avg_unit_price'])
+        self.ax.clear()
 
-        if agg.empty:
-            self.ax.clear()
+        if not points:
             self.canvas.draw()
             self.kpi.setText(
-                'После агрегации данных не осталось (проверь количество/цены).'
+                "Нет данных для вклада (нужны база и последний период)."
             )
             return
 
-        base = float(agg["avg_unit_price"].iloc[0])
-        last = float(agg["avg_unit_price"].iloc[-1])
-        agg["index_100"] = (agg["avg_unit_price"] / base) * 100.0
-        inflation_pct = (last / base - 1.0) * 100.0
-
-        # --- график ---
-        self.ax.clear()
-        self.ax.axhline(100, linestyle="--", linewidth=1)  # линия базы
-
-        if len(agg) == 1:
-            # одна точка — рисуем точкой и ужимаем X
-            self.ax.scatter(agg.index, agg['index_100'])
-            x = agg.index[0]
-            self.ax.set_xlim(
-                x - pd.Timedelta(days=20),
-                x + pd.Timedelta(days=20)
+        labels: list[str] = []
+        vals: list[float] = []
+        for p in points:
+            labels.append(
+                p.get("product")
+                or p.get("category")
+                or str(p.get("product_id") or p.get("category_id"))
             )
-        else:
-            self.ax.plot(agg.index, agg['index_100'], marker='o')
+            vals.append(float(p["contribution"]))
 
-        self.ax.set_title('Индекс инфляции по продукту (база=100)')
-        self.ax.set_ylabel('Индекс')
-        self.ax.grid(True)
-        self.figure.tight_layout()
+        self.ax.bar(labels, vals)
+        self.ax.set_title(title)
+        self.ax.set_ylabel("Пункты индекса")
+        self.ax.grid(True, axis="y")
+        self.ax.tick_params(axis="x", labelrotation=45)
         self.canvas.draw()
 
-        periods = len(agg)
-        if periods < 2:
-            inflation_text = '— (нужны минимум 2 периода)'
+        if isinstance(kpi, dict):
+            self.kpi.setText(
+                f'База: {kpi.get("base_period")}'
+                f'→ {kpi.get("target_period")}\n'
+                f'Покрытый вес: {kpi.get("covered_weight")}'
+            )
         else:
-            inflation_text = f'{inflation_pct:.2f}'
+            self.kpi.setText("Готово.")
 
-        data_start = df.index.min().date().isoformat()
-        data_end = df.index.max().date().isoformat()
-        self.kpi.setText(
-            f'Период: {data_start} — {data_end}\n'
-            f'База: {base:.2f}\n'
-            f'Текущая: {last:.2f}\n'
-            f'Инфляция за период: {inflation_text}%\n'
-            f'Записей: {int(agg["n"].sum())}'
-        )
+    def _plot_cheapest(self, res: dict, *, title: str) -> None:
+        points = res.get("points") or []
+        kpi = res.get("kpi")
+
+        self.ax.clear()
+
+        if not points:
+            self.canvas.draw()
+            self.kpi.setText("Нет данных под выбранные фильтры.")
+            return
+
+        labels = [p["store"] for p in points]
+        vals = [float(p["avg_unit_price"]) for p in points]
+
+        self.ax.bar(labels, vals)
+        self.ax.set_title(title)
+        self.ax.set_ylabel("Цена за единицу")
+        self.ax.grid(True, axis="y")
+        self.ax.tick_params(axis="x", labelrotation=45)
+        self.canvas.draw()
+
+        if isinstance(kpi, dict):
+            best_avg = kpi.get("best_avg_unit_price")
+            best_avg_s = f"{best_avg:.2f}" if isinstance(
+                best_avg, (int, float)
+            ) else str(best_avg)
+            self.kpi.setText(
+                f'Магазинов: {kpi.get("stores")}\n'
+                f'Лучший: id={kpi.get("best_store_id")} (avg={best_avg_s})'
+            )
+        else:
+            self.kpi.setText("Готово.")

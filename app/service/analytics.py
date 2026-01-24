@@ -4,7 +4,10 @@ from datetime import date
 from typing import Any, Literal, Optional
 
 import pandas as pd
+from sqlalchemy import func, select
 
+from app.core.db import get_session
+from app.models import Product, Purchase
 from app.service.purchases import (
     list_purchases_filtered,
 )
@@ -20,6 +23,7 @@ _GROUP_TO_PERIOD = {
     'month': 'M',
     'year': 'Y',
 }
+CountBy = Literal["product", "category", "store"]
 
 
 def _ensure_group_by(group_by: str) -> GroupBy:
@@ -263,7 +267,6 @@ def _laspeyres_index(
 
     total_base_weight = float(base_agg["base_weight"].sum())
 
-    # period prices
     per_agg = (
         df.groupby(["period", "product_id"], as_index=False)
         .agg(qty=("quantity", "sum"), spend=("spend", "sum"))
@@ -321,6 +324,32 @@ def _laspeyres_index(
     }
 
     return {"points": points, "kpi": kpi}
+
+
+def purchase_counts(*, by: CountBy) -> dict[int, int]:
+    with get_session() as db:
+        if by == "product":
+            stmt = (
+                select(Purchase.product_id, func.count(Purchase.id))
+                .where(Purchase.product_id.isnot(None))
+                .group_by(Purchase.product_id)
+            )
+        elif by == "store":
+            stmt = (
+                select(Purchase.store_id, func.count(Purchase.id))
+                .where(Purchase.store_id.isnot(None))
+                .group_by(Purchase.store_id)
+            )
+        else:  # category
+            stmt = (
+                select(Product.category_id, func.count(Purchase.id))
+                .join(Purchase.product)
+                .where(Product.category_id.isnot(None))
+                .group_by(Product.category_id)
+            )
+
+        rows = db.execute(stmt).all()
+        return {int(k): int(v) for k, v in rows if k is not None}
 
 
 def product_inflation_index(

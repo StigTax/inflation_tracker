@@ -13,7 +13,7 @@ ts['period'] = pd.to_datetime(ts['period'])
 
 fig, ax = plt.subplots()
 ax.plot(ts['period'], ts['index_100'])
-ax.set_title('Индекс инфляции (база=100)')
+ax.set_title('Индекс инфляции')
 ax.set_xlabel('Период')
 ax.set_ylabel('Индекс')
 ax.grid(True)
