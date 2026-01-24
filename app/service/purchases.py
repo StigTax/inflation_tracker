@@ -186,3 +186,28 @@ def list_purchases(
 def delete_purchase(purchase_id: int) -> None:
     with get_session() as db:
         purchase_crud.delete(db=db, obj_id=purchase_id)
+
+
+@logged(level=logging.DEBUG, skip_empty=True)
+def list_purchases_filtered(
+    *,
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None,
+    store_id: Optional[int] = None,
+    product_id: Optional[int] = None,
+    product_ids: Optional[list[int]] = None,
+    category_id: Optional[int] = None,
+    is_promo: Optional[bool] = None,
+) -> list[Purchase]:
+    from_date, to_date = validate_date_range(from_date, to_date)
+    with get_session() as db:
+        return purchase_crud.list_filtered(
+            db=db,
+            date_from=from_date,
+            date_to=to_date,
+            store_id=store_id,
+            product_id=product_id,
+            product_ids=product_ids,
+            category_id=category_id,
+            is_promo=is_promo,
+        )

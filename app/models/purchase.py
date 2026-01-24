@@ -83,7 +83,6 @@ class Purchase(Base):
         '''Цена за единицу — вычисляемая, чтобы не было рассинхрона.'''
         if not self.quantity:
             return Decimal('0')
-        # total_price/quantity уже Decimal (из Numeric)
         return (
             Decimal(self.total_price) / Decimal(self.quantity)
         ).quantize(Decimal('0.01'))
@@ -126,6 +125,7 @@ class Purchase(Base):
             'product': getattr(product, 'name', None),
 
             'category': getattr(category, 'name', None),
+            'category_id': getattr(product, 'category_id', None),
             'measure_type': getattr(unit, 'measure_type', None),
             'unit': getattr(unit, 'unit', None),
 

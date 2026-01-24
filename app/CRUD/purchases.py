@@ -86,5 +86,49 @@ class PurchaseCRUD(CRUDBase[Purchase]):
         stmt = self._with_relations(stmt.order_by(Purchase.purchase_date))
         return list(db.scalars(stmt).all())
 
+    def list_filtered(
+        self,
+        db: Session,
+        *,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        store_id: Optional[int] = None,
+        product_id: Optional[int] = None,
+        product_ids: Optional[list[int]] = None,
+        category_id: Optional[int] = None,
+        is_promo: Optional[bool] = None,
+        order_by=None,
+    ) -> list[Purchase]:
+        """Универсальная выборка покупок для аналитики."""
+        stmt = select(Purchase)
+
+        if category_id is not None:
+            stmt = stmt.join(
+                Purchase.product
+            ).where(
+                Product.category_id == category_id
+            )
+
+        if store_id is not None:
+            stmt = stmt.where(Purchase.store_id == store_id)
+
+        if product_id is not None:
+            stmt = stmt.where(Purchase.product_id == product_id)
+
+        if product_ids:
+            stmt = stmt.where(Purchase.product_id.in_(product_ids))
+
+        if is_promo is not None:
+            stmt = stmt.where(Purchase.is_promo == is_promo)
+
+        if date_from is not None:
+            stmt = stmt.where(Purchase.purchase_date >= date_from)
+        if date_to is not None:
+            stmt = stmt.where(Purchase.purchase_date <= date_to)
+
+        stmt = stmt.order_by(order_by or Purchase.purchase_date)
+        stmt = self._with_relations(stmt)
+        return list(db.scalars(stmt).all())
+
 
 crud = PurchaseCRUD(Purchase)
