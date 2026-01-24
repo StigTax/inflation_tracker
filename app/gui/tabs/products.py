@@ -1,4 +1,4 @@
-'''Вкладка GUI для продуктов.'''
+"""Вкладка GUI для продуктов."""
 
 from __future__ import annotations
 

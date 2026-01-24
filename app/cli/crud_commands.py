@@ -1,4 +1,4 @@
-'''CLI-команды для CRUD-операций.'''
+"""CLI-команды для CRUD-операций."""
 
 from __future__ import annotations
 

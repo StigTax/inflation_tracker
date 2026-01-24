@@ -1,4 +1,4 @@
-'''Сервис аналитики и расчётов индексов.'''
+"""Сервис аналитики и расчётов индексов."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ def _ensure_promo_mode(promo_mode: str) -> PromoMode:
 
 
 def _period_start(dts: pd.Series, group_by: GroupBy) -> pd.Series:
-    '''Возвращает дату начала периода.
+    """Возвращает дату начала периода.
 
     Args:
         dts: Серия дат/времени.
@@ -56,7 +56,7 @@ def _period_start(dts: pd.Series, group_by: GroupBy) -> pd.Series:
 
     Returns:
         pd.Series: Серия дат начала периода (datetime64[ns]).
-    '''
+    """
     dts = pd.to_datetime(dts).dt.normalize()
 
     if group_by == 'day':
@@ -110,7 +110,7 @@ def _compute_price_and_spend(
     df: pd.DataFrame,
     price_mode: PriceMode
 ) -> pd.DataFrame:
-    '''Добавляет расчетные цены и затраты.
+    """Добавляет расчетные цены и затраты.
 
     Args:
         df: Датафрейм с покупками.
@@ -118,7 +118,7 @@ def _compute_price_and_spend(
 
     Returns:
         pd.DataFrame: Датафрейм с колонками unit_price_used и spend.
-    '''
+    """
     if df.empty:
         return df
 
@@ -209,7 +209,7 @@ def _laspeyres_index(
     *,
     base_period: Optional[pd.Timestamp] = None,
 ) -> dict[str, Any]:
-    '''Считает индекс Ласпейреса с весами базового периода.
+    """Считает индекс Ласпейреса с весами базового периода.
 
     Если в периоде нет данных по части товаров, индекс считается по
     доступной части корзины и возвращается coverage.
@@ -220,7 +220,7 @@ def _laspeyres_index(
 
     Returns:
         dict[str, Any]: Точки индекса и KPI.
-    '''
+    """
     if df.empty:
         return {
             'points': [],
@@ -468,7 +468,7 @@ def basket_inflation_index(
     price_mode: PriceMode = 'paid',
     promo_mode: PromoMode = 'include',
 ) -> dict[str, Any]:
-    '''Считает индекс по выбранной корзине продуктов.
+    """Считает индекс по выбранной корзине продуктов.
 
     Args:
         from_date: Дата начала периода.
@@ -480,7 +480,7 @@ def basket_inflation_index(
 
     Returns:
         dict[str, Any]: Точки индекса и KPI.
-    '''
+    """
     group_by = _ensure_group_by(group_by)
     price_mode = _ensure_price_mode(price_mode)
     promo_mode = _ensure_promo_mode(promo_mode)
@@ -505,7 +505,7 @@ def category_inflation_index(
     price_mode: PriceMode = 'paid',
     promo_mode: PromoMode = 'include',
 ) -> dict[str, Any]:
-    '''Считает индекс инфляции внутри категории.
+    """Считает индекс инфляции внутри категории.
 
     Args:
         category_id: Идентификатор категории.
@@ -517,7 +517,7 @@ def category_inflation_index(
 
     Returns:
         dict[str, Any]: Точки индекса и KPI.
-    '''
+    """
     group_by = _ensure_group_by(group_by)
     price_mode = _ensure_price_mode(price_mode)
     promo_mode = _ensure_promo_mode(promo_mode)
@@ -543,7 +543,7 @@ def store_inflation_index(
     price_mode: PriceMode = 'paid',
     promo_mode: PromoMode = 'include',
 ) -> dict[str, Any]:
-    '''Считает индекс инфляции по магазину.
+    """Считает индекс инфляции по магазину.
 
     Можно ограничить корзину product_ids.
 
@@ -558,7 +558,7 @@ def store_inflation_index(
 
     Returns:
         dict[str, Any]: Точки индекса и KPI.
-    '''
+    """
     group_by = _ensure_group_by(group_by)
     price_mode = _ensure_price_mode(price_mode)
     promo_mode = _ensure_promo_mode(promo_mode)
@@ -583,7 +583,7 @@ def product_store_price_stats(
     price_mode: PriceMode = 'paid',
     promo_mode: PromoMode = 'include',
 ) -> dict[str, Any]:
-    '''Возвращает средние цены по магазинам для продукта.
+    """Возвращает средние цены по магазинам для продукта.
 
     Результат отсортирован по средней цене.
 
@@ -596,7 +596,7 @@ def product_store_price_stats(
 
     Returns:
         dict[str, Any]: Статистика по магазинам и KPI.
-    '''
+    """
     price_mode = _ensure_price_mode(price_mode)
     promo_mode = _ensure_promo_mode(promo_mode)
 
@@ -678,7 +678,7 @@ def inflation_contributions(
     promo_mode: PromoMode = 'include',
     top: int = 10,
 ) -> dict[str, Any]:
-    '''Считает вклад в инфляцию относительно базового периода.
+    """Считает вклад в инфляцию относительно базового периода.
 
     Args:
         by: Группировка вклада (product/category).
@@ -694,7 +694,7 @@ def inflation_contributions(
 
     Returns:
         dict[str, Any]: Список вкладов и KPI.
-    '''
+    """
     group_by = _ensure_group_by(group_by)
     price_mode = _ensure_price_mode(price_mode)
     promo_mode = _ensure_promo_mode(promo_mode)

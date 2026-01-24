@@ -1,4 +1,4 @@
-'''Модель покупки.'''
+"""Модель покупки."""
 
 from __future__ import annotations
 
@@ -82,11 +82,11 @@ class Purchase(Base):
 
     @property
     def unit_price(self) -> Decimal:
-        '''Цена за единицу, вычисляемая из суммы и количества.
+        """Цена за единицу, вычисляемая из суммы и количества.
 
         Returns:
             Decimal: Цена за единицу.
-        '''
+        """
         if not self.quantity:
             return Decimal('0')
         return (

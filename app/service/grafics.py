@@ -1,4 +1,4 @@
-'''Скрипт построения графиков аналитики.'''
+"""Скрипт построения графиков аналитики."""
 
 import matplotlib.pyplot as plt
 import pandas as pd

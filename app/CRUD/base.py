@@ -1,4 +1,4 @@
-'''Базовый класс CRUD-операций.'''
+"""Базовый класс CRUD-операций."""
 
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ class CRUDBase(Generic[ModelT]):
         db: Session,
         obj_id: int,
     ) -> ModelT:
-        '''Получает объект по ID или выбрасывает ошибку.
+        """Получает объект по ID или выбрасывает ошибку.
 
         Args:
             db: Сессия SQLAlchemy.
@@ -69,7 +69,7 @@ class CRUDBase(Generic[ModelT]):
 
         Raises:
             ValueError: Если объект не найден.
-        '''
+        """
         obj = select(
             self.model,
         ).where(self.model.id == obj_id)
@@ -85,7 +85,7 @@ class CRUDBase(Generic[ModelT]):
         limit: int = 100,
         order_by: Optional[Any] = None,
     ) -> list[ModelT]:
-        '''Возвращает список объектов с пагинацией и сортировкой.
+        """Возвращает список объектов с пагинацией и сортировкой.
 
         Args:
             db: Сессия SQLAlchemy.
@@ -95,7 +95,7 @@ class CRUDBase(Generic[ModelT]):
 
         Returns:
             list[ModelT]: Список объектов.
-        '''
+        """
         stmt = select(
             self.model,
         ).offset(offset).limit(limit)
@@ -110,7 +110,7 @@ class CRUDBase(Generic[ModelT]):
         obj_in: ModelT,
         commit: bool = True,
     ) -> ModelT:
-        '''Создает объект в базе данных.
+        """Создает объект в базе данных.
 
         Args:
             db: Сессия SQLAlchemy.
@@ -119,7 +119,7 @@ class CRUDBase(Generic[ModelT]):
 
         Returns:
             ModelT: Созданный объект.
-        '''
+        """
         db.add(obj_in)
         if commit:
             db.commit()
@@ -135,7 +135,7 @@ class CRUDBase(Generic[ModelT]):
         touch_updated_at: bool = True,
         **fields: Any,
     ) -> ModelT:
-        '''Обновляет объект по ID.
+        """Обновляет объект по ID.
 
         Args:
             db: Сессия SQLAlchemy.
@@ -146,7 +146,7 @@ class CRUDBase(Generic[ModelT]):
 
         Returns:
             ModelT: Обновленный объект.
-        '''
+        """
         obj = self.get_or_raise(db, obj_id)
         for name, value in fields.items():
             if value is not None:
@@ -167,13 +167,13 @@ class CRUDBase(Generic[ModelT]):
         *,
         commit: bool = True,
     ) -> None:
-        '''Удаляет объект по ID.
+        """Удаляет объект по ID.
 
         Args:
             db: Сессия SQLAlchemy.
             obj_id: Идентификатор объекта.
             commit: Выполнять ли commit сразу.
-        '''
+        """
         obj = self.get_or_raise(db, obj_id)
         db.delete(obj)
         if commit:

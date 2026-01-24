@@ -1,4 +1,4 @@
-'''Пакет логирования.'''
+"""Пакет логирования."""
 
 from app.logging.decorators import logged
 

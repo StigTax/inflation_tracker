@@ -1,4 +1,4 @@
-'''Табличная модель для GUI.'''
+"""Табличная модель для GUI."""
 
 from __future__ import annotations
 

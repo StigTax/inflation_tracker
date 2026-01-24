@@ -1,4 +1,4 @@
-'''Доступ к данным для GUI.'''
+"""Доступ к данным для GUI."""
 
 from PyQt6.QtWidgets import (
     QDialog,

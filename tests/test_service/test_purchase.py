@@ -1,4 +1,4 @@
-'''Тесты сервиса покупок.'''
+"""Тесты сервиса покупок."""
 
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal

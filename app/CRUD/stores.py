@@ -1,4 +1,4 @@
-'''CRUD-операции для магазинов.'''
+"""CRUD-операции для магазинов."""
 
 from app.crud.base import CRUDBase
 from app.models import Store

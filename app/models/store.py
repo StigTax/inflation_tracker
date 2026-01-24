@@ -1,4 +1,4 @@
-'''Модель магазина.'''
+"""Модель магазина."""
 
 from sqlalchemy import Column, String, Text
 from sqlalchemy.orm import relationship

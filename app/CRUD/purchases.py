@@ -1,4 +1,4 @@
-'''CRUD-операции для покупок.'''
+"""CRUD-операции для покупок."""
 
 from __future__ import annotations
 
@@ -101,7 +101,7 @@ class PurchaseCRUD(CRUDBase[Purchase]):
         is_promo: Optional[bool] = None,
         order_by=None,
     ) -> list[Purchase]:
-        '''Универсальная выборка покупок для аналитики.
+        """Универсальная выборка покупок для аналитики.
 
         Args:
             db: Сессия SQLAlchemy.
@@ -116,7 +116,7 @@ class PurchaseCRUD(CRUDBase[Purchase]):
 
         Returns:
             list[Purchase]: Список покупок.
-        '''
+        """
         stmt = select(Purchase)
 
         if category_id is not None:

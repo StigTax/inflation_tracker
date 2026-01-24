@@ -1,4 +1,4 @@
-'''Точка входа GUI.'''
+"""Точка входа GUI."""
 
 from __future__ import annotations
 

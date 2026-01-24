@@ -1,4 +1,4 @@
-'''Фикстуры и общие настройки тестов.'''
+"""Фикстуры и общие настройки тестов."""
 
 import os
 from contextlib import contextmanager

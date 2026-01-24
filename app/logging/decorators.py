@@ -1,4 +1,4 @@
-'''Декораторы и утилиты логирования.'''
+"""Декораторы и утилиты логирования."""
 
 from __future__ import annotations
 
@@ -230,7 +230,7 @@ def logged(
     skip_none: bool = True,
     skip_empty: bool = False,
 ) -> Callable[[F], F]:
-    '''Декоратор для логирования вызова функции.
+    """Декоратор для логирования вызова функции.
 
     Пишет события start/ok/error и время выполнения. Аргументы и результат
     форматируются безопасно с ограничением длины и без тяжёлых
@@ -249,7 +249,7 @@ def logged(
 
     Returns:
         Callable[[F], F]: Декоратор, оборачивающий функцию.
-    '''
+    """
 
     def decorator(func: F) -> F:
         log = logger or logging.getLogger(func.__module__)

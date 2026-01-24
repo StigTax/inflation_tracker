@@ -1,4 +1,4 @@
-'''Точка входа CLI.'''
+"""Точка входа CLI."""
 
 from __future__ import annotations
 

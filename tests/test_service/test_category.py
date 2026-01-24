@@ -1,4 +1,4 @@
-'''Тесты сервиса категорий.'''
+"""Тесты сервиса категорий."""
 
 from app.crud.categories import crud
 from app.service import crud_service

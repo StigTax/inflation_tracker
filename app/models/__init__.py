@@ -1,4 +1,4 @@
-'''Пакет моделей домена.'''
+"""Пакет моделей домена."""
 
 from .category import Category  # noqa
 from .product import Product, Unit  # noqa

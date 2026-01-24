@@ -1,4 +1,4 @@
-'''CRUD-операции для продуктов.'''
+"""CRUD-операции для продуктов."""
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload

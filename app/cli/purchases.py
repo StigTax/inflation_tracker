@@ -1,4 +1,4 @@
-'''CLI-команды для покупок.'''
+"""CLI-команды для покупок."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-'''Модель продукта.'''
+"""Модель продукта."""
 
 from __future__ import annotations
 
