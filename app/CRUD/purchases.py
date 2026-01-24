@@ -1,3 +1,5 @@
+'''CRUD-операции для покупок.'''
+
 from __future__ import annotations
 
 from datetime import date
@@ -99,7 +101,22 @@ class PurchaseCRUD(CRUDBase[Purchase]):
         is_promo: Optional[bool] = None,
         order_by=None,
     ) -> list[Purchase]:
-        """Универсальная выборка покупок для аналитики."""
+        '''Универсальная выборка покупок для аналитики.
+
+        Args:
+            db: Сессия SQLAlchemy.
+            date_from: Начальная дата.
+            date_to: Конечная дата.
+            store_id: Идентификатор магазина.
+            product_id: Идентификатор продукта.
+            product_ids: Список идентификаторов продуктов.
+            category_id: Идентификатор категории.
+            is_promo: Фильтр по акциям.
+            order_by: Поле сортировки.
+
+        Returns:
+            list[Purchase]: Список покупок.
+        '''
         stmt = select(Purchase)
 
         if category_id is not None:

@@ -1,3 +1,5 @@
+'''Вкладка GUI для магазинов.'''
+
 from __future__ import annotations
 
 from PyQt6.QtWidgets import (
@@ -156,7 +158,7 @@ class StoresTab(QWidget):
         ok = QMessageBox.question(
             self,
             'Подтверждение',
-            f'Удалить категорию "{row.get("name")}" (id={row["id"]})?',
+            f'Удалить категорию \"{row.get("name")}\" (id={row["id"]})?',
         )
         if ok != QMessageBox.StandardButton.Yes:
             return

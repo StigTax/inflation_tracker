@@ -1,3 +1,5 @@
+'''Сервисный слой для CRUD-операций.'''
+
 from __future__ import annotations
 
 import logging

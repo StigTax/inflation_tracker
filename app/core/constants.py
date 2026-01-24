@@ -1,3 +1,5 @@
+'''Константы приложения.'''
+
 from datetime import date
 from pathlib import Path
 

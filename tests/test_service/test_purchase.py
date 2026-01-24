@@ -1,3 +1,5 @@
+'''Тесты сервиса покупок.'''
+
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -7,7 +9,7 @@ from app.service import purchases
 
 def money_div(total: float, qty: float) -> Decimal:
     return (Decimal(str(total)) / Decimal(str(qty))).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
+        Decimal('0.01'), rounding=ROUND_HALF_UP
     )
 
 
@@ -28,14 +30,14 @@ def test_update_purchase_total_price_and_quantity(purchase_product):
         purchase_id=purchase_product.id,
         total_price=140.0,
         quantity=3.0,
-        comment="Новый комментарий",
+        comment='Новый комментарий',
     )
 
     assert updated_purchase.id == purchase_product.id
     assert updated_purchase.total_price == pytest.approx(140.0)
     assert updated_purchase.quantity == pytest.approx(3.0)
     assert updated_purchase.unit_price == money_div(140.0, 3.0)
-    assert updated_purchase.comment == "Новый комментарий"
+    assert updated_purchase.comment == 'Новый комментарий'
 
 
 def test_get_purchase_by_id(purchase_product):
@@ -134,7 +136,7 @@ def test_update_purchase_date_in_future_raises_error(purchase_product):
             purchase_date=future_date,
         )
 
-    assert "в будущем" in str(exc_info.value)
+    assert 'в будущем' in str(exc_info.value)
 
 
 def test_create_purchase_with_negative_quantity_raises_error(
@@ -152,7 +154,7 @@ def test_create_purchase_with_negative_quantity_raises_error(
             purchase_date=date(2024, 3, 1),
         )
 
-    assert "Количество товара" in str(exc_info.value)
+    assert 'Количество товара' in str(exc_info.value)
 
 
 def test_create_purchase_with_zero_price_raises_error(
@@ -170,18 +172,18 @@ def test_create_purchase_with_zero_price_raises_error(
             purchase_date=date(2024, 3, 1),
         )
 
-    assert "Стоимость" in str(exc_info.value)
+    assert 'Стоимость' in str(exc_info.value)
 
 
 def test_update_purchase_set_promo_fields_turns_promo_on(purchase_product):
     updated = purchases.update_purchase(
         purchase_id=purchase_product.id,
-        promo_type="discount",
+        promo_type='discount',
         regular_unit_price=99.0,
     )
 
     assert updated.is_promo is True
-    assert updated.promo_type == "discount"
+    assert updated.promo_type == 'discount'
     assert updated.regular_unit_price == pytest.approx(99.0)
 
 

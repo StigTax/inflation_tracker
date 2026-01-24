@@ -1,3 +1,5 @@
+'''Вкладка GUI для единиц измерения.'''
+
 from __future__ import annotations
 
 from PyQt6.QtWidgets import (
@@ -27,16 +29,16 @@ from app.validate.exceptions import ObjectInUseError
 
 
 class UnitDialog(QDialog):
-    def __init__(self, parent=None, *, measure_type: str = "", unit: str = ""):
+    def __init__(self, parent=None, *, measure_type: str = '', unit: str = ''):
         super().__init__(parent)
-        self.setWindowTitle("Единица измерения")
+        self.setWindowTitle('Единица измерения')
 
         self.measure_type_edit = QLineEdit(measure_type)
         self.unit_edit = QLineEdit(unit)
 
         form = QFormLayout()
-        form.addRow("Тип (например: вес/объём/штуки):", self.measure_type_edit)
-        form.addRow("Единица (например: кг/л/шт):", self.unit_edit)
+        form.addRow('Тип (например: вес/объём/штуки):', self.measure_type_edit)
+        form.addRow('Единица (например: кг/л/шт):', self.unit_edit)
 
         buttons = QDialogButtonBox()
         buttons.addButton(QDialogButtonBox.StandardButton.Ok)
@@ -162,7 +164,7 @@ class UnitsTab(QWidget):
         ok = QMessageBox.question(
             self,
             'Подтверждение',
-            f'Удалить единицу измерения "{label}" (id={row["id"]})?',
+            f'Удалить единицу измерения \"{label}\" (id={row["id"]})?',
         )
         if ok != QMessageBox.StandardButton.Yes:
             return

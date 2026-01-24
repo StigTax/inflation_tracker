@@ -1,12 +1,15 @@
+'''Проверки бизнес-ограничений и зависимостей.'''
+
 from __future__ import annotations
 
 import logging
 from typing import Iterable
 
-from app.validate.exceptions import ObjectInUseError
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement
+
+from app.validate.exceptions import ObjectInUseError
 
 logger = logging.getLogger(__name__)
 

@@ -1,3 +1,5 @@
+'''Настройка логирования приложения.'''
+
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -15,7 +17,7 @@ from app.core.constants import (
 
 
 class ColoredConsoleHandler(logging.StreamHandler):
-    """Хендлер для цветного вывода в консоль."""
+    '''Хендлер для цветного вывода в консоль.'''
 
     COLOR_MAP = {
         logging.CRITICAL: RED,
@@ -29,14 +31,14 @@ class ColoredConsoleHandler(logging.StreamHandler):
         try:
             message = self.format(record)
             color = self.COLOR_MAP.get(record.levelno, RESET)
-            self.stream.write(f"{color}{message}{RESET}\n")
+            self.stream.write(f'{color}{message}{RESET}\n')
             self.flush()
         except Exception:
             self.handleError(record)
 
 
 def configure_logging():
-    """Настройка логгера приложения."""
+    '''Настраивает логгер приложения.'''
     log_dir = LOG_DIR
     log_dir.mkdir(exist_ok=True)
     log_file = LOG_FILE

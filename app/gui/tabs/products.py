@@ -1,3 +1,5 @@
+'''Вкладка GUI для продуктов.'''
+
 from __future__ import annotations
 
 from typing import Optional
@@ -247,7 +249,7 @@ class ProductsTab(QWidget):
         ok = QMessageBox.question(
             self,
             'Подтверждение',
-            f'Удалить продукт "{row.get("name")}" (id={row["id"]})?',
+            f'Удалить продукт \"{row.get("name")}\" (id={row["id"]})?',
         )
         if ok != QMessageBox.StandardButton.Yes:
             return

@@ -1,3 +1,5 @@
+'''CLI-команды для покупок.'''
+
 from __future__ import annotations
 
 import argparse

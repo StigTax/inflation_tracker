@@ -1,3 +1,5 @@
+'''Настройки и параметры CLI.'''
+
 import argparse
 
 ACTION_CHICES = [

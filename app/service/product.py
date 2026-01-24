@@ -1,3 +1,5 @@
+'''Сервисные операции для продуктов.'''
+
 from __future__ import annotations
 
 import logging

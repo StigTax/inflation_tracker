@@ -1,3 +1,5 @@
+'''Доступ к данным для GUI.'''
+
 from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -16,17 +18,17 @@ from app.gui.tabs.units import UnitsTab
 class DataManagerDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Данные")
+        self.setWindowTitle('Данные')
         self.resize(1000, 650)
 
         tabs = QTabWidget()
-        tabs.addTab(StoresTab(), "Магазины")
-        tabs.addTab(CategoriesTab(), "Категории")
-        tabs.addTab(UnitsTab(), "Единицы")
-        tabs.addTab(ProductsTab(), "Продукты")
-        tabs.addTab(PurchasesTab(), "Покупки")
+        tabs.addTab(StoresTab(), 'Магазины')
+        tabs.addTab(CategoriesTab(), 'Категории')
+        tabs.addTab(UnitsTab(), 'Единицы')
+        tabs.addTab(ProductsTab(), 'Продукты')
+        tabs.addTab(PurchasesTab(), 'Покупки')
 
-        btn_close = QPushButton("Закрыть")
+        btn_close = QPushButton('Закрыть')
         btn_close.clicked.connect(self.accept)
 
         bottom = QHBoxLayout()

@@ -1,3 +1,5 @@
+'''Табличная модель для GUI.'''
+
 from __future__ import annotations
 
 from typing import Optional

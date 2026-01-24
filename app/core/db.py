@@ -1,3 +1,5 @@
+'''Подключение и управление базой данных.'''
+
 import os
 import re
 from contextlib import contextmanager
@@ -64,6 +66,7 @@ def get_session():
         yield session
     finally:
         session.close()
+
 
 @contextmanager
 def session_scope():

@@ -1,3 +1,5 @@
+'''Вкладка GUI для покупок.'''
+
 from __future__ import annotations
 
 from datetime import date

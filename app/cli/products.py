@@ -1,3 +1,5 @@
+'''CLI-команды для продуктов.'''
+
 from __future__ import annotations
 
 import argparse

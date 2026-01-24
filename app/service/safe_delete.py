@@ -1,3 +1,5 @@
+'''Безопасное удаление сущностей.'''
+
 from __future__ import annotations
 
 from app.crud import category_crud, product_crud, store_crud, unit_crud

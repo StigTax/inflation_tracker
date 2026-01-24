@@ -1,3 +1,5 @@
+'''CLI-команды для категорий.'''
+
 from __future__ import annotations
 
 import argparse

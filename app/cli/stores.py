@@ -1,3 +1,5 @@
+'''CLI-команды для магазинов.'''
+
 from __future__ import annotations
 
 import argparse

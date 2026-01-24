@@ -1,3 +1,5 @@
+'''CLI-команды для единиц измерения.'''
+
 from __future__ import annotations
 
 import argparse

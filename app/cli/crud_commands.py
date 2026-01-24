@@ -1,3 +1,5 @@
+'''CLI-команды для CRUD-операций.'''
+
 from __future__ import annotations
 
 import argparse

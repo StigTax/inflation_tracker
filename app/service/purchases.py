@@ -1,13 +1,17 @@
+'''Сервисные операции для покупок.'''
+
 from __future__ import annotations
 
 import logging
 from datetime import date
 from typing import Optional
 
+from sqlalchemy import func, select
+
 from app.core.db import get_session
 from app.crud.purchases import crud as purchase_crud
 from app.logging import logged
-from app.models import Purchase
+from app.models import Product, Purchase
 from app.validate.validators import (
     validate_date_not_in_future,
     validate_date_range,
@@ -211,3 +215,67 @@ def list_purchases_filtered(
             category_id=category_id,
             is_promo=is_promo,
         )
+
+def get_purchase_date_bounds() -> tuple[Optional[date], Optional[date]]:
+    """Возвращает минимальную и максимальную дату покупок.
+
+    Returns:
+        Кортеж (min_date, max_date) по Purchase.purchase_date.
+        Если покупок нет, возвращается (None, None).
+    """
+    with get_session() as db:
+        row = db.execute(
+            select(
+                func.min(Purchase.purchase_date),
+                func.max(Purchase.purchase_date),
+            )
+        ).one()
+        return row[0], row[1]
+
+
+def get_purchase_usage_counts() -> dict[str, dict[int, int]]:
+    """Возвращает счётчики покупок для отображения в UI.
+
+    Используется, чтобы в выпадающих списках показывать количество покупок,
+    а пользователь не выбирал сущности 'на ощупь'.
+
+    Returns:
+        Словарь вида:
+        {
+            'products': {product_id: count},
+            'stores': {store_id: count},
+            'categories': {category_id: count},
+        }
+    """
+    with get_session() as db:
+        prod_rows = db.execute(
+            select(Purchase.product_id, func.count(Purchase.id))
+            .where(Purchase.product_id.is_not(None))
+            .group_by(Purchase.product_id)
+        ).all()
+
+        store_rows = db.execute(
+            select(Purchase.store_id, func.count(Purchase.id))
+            .where(Purchase.store_id.is_not(None))
+            .group_by(Purchase.store_id)
+        ).all()
+
+        cat_rows = db.execute(
+            select(Product.category_id, func.count(Purchase.id))
+            .select_from(Purchase)
+            .join(Product, Product.id == Purchase.product_id)
+            .where(Product.category_id.is_not(None))
+            .group_by(Product.category_id)
+        ).all()
+
+    return {
+        'products': {
+            int(pid): int(cnt) for pid, cnt in prod_rows if pid is not None
+        },
+        'stores': {
+            int(sid): int(cnt) for sid, cnt in store_rows if sid is not None
+        },
+        'categories': {
+            int(cid): int(cnt) for cid, cnt in cat_rows if cid is not None
+        },
+    }

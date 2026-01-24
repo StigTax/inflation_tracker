@@ -1,3 +1,5 @@
+'''Фикстуры и общие настройки тестов.'''
+
 import os
 from contextlib import contextmanager
 from datetime import date
@@ -189,7 +191,7 @@ def purchase_product(product_vegetable, few_stores):
         quantity=2.0,
         price=150.0,
         purchase_date=date(2024, 1, 5),
-        comment="Покупка огурцов",
+        comment='Покупка огурцов',
         is_promo=False,
         promo_type=None,
         regular_unit_price=None,
@@ -216,7 +218,7 @@ def few_purchase_in_single_store(product_vegetable, single_store):
         price=120.0,
         purchase_date=date(2024, 2, 15),
         is_promo=True,
-        promo_type="discount",
+        promo_type='discount',
         regular_unit_price=95.0,
     )
     return [pur_1, pur_2]
@@ -242,7 +244,7 @@ def few_purchase_in_few_stores(product_vegetable, few_stores):
         price=90.0,
         purchase_date=date(2024, 3, 6),
         is_promo=True,
-        promo_type="loyalty",
+        promo_type='loyalty',
         regular_unit_price=105.0,
     )
     pur_3 = purchases.create_purchase(

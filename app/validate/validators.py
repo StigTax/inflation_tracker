@@ -1,3 +1,5 @@
+'''Функции валидации входных данных.'''
+
 import logging
 import re
 from datetime import date as dt_date
@@ -8,7 +10,19 @@ T = TypeVar('T')
 
 
 def ensure_item_exists(item: Optional[T], item_name: str, item_id: int) -> T:
-    """Проверяет, что объект найден. Возвращает item (удобно для чейнинга)."""
+    '''Проверяет, что объект найден.
+
+    Args:
+        item: Объект или None.
+        item_name: Имя сущности для сообщения об ошибке.
+        item_id: Идентификатор сущности.
+
+    Returns:
+        T: Найденный объект.
+
+    Raises:
+        ValueError: Если объект не найден.
+    '''
     if item is None:
         logger.info('%s with id=%s not found', item_name, item_id)
         raise ValueError(f'{item_name} с ID {item_id} не найден.')
@@ -16,9 +30,19 @@ def ensure_item_exists(item: Optional[T], item_name: str, item_id: int) -> T:
 
 
 def validate_date_not_in_future(value: Optional[dt_date]) -> dt_date:
-    """Возвращает дату, гарантируя что она не в будущем.
-    Если value=None — подставляется сегодняшняя дата.
-    """
+    '''Проверяет, что дата не в будущем.
+
+    Если value=None, возвращается сегодняшняя дата.
+
+    Args:
+        value: Дата или None.
+
+    Returns:
+        dt_date: Валидная дата.
+
+    Raises:
+        ValueError: Если дата в будущем.
+    '''
     today = dt_date.today()
     if value is None:
         return today
@@ -38,7 +62,18 @@ def validate_date_range(
 
 
 def validate_positive_value(value: float, field_name: str) -> float:
-    """Проверяет, что число > 0."""
+    '''Проверяет, что значение больше нуля.
+
+    Args:
+        value: Проверяемое значение.
+        field_name: Имя поля для сообщения об ошибке.
+
+    Returns:
+        float: Исходное значение.
+
+    Raises:
+        ValueError: Если значение меньше либо равно нулю.
+    '''
     if value <= 0:
         logger.info('Non-positive value blocked: %s=%s', field_name, value)
         raise ValueError(f'{field_name} не может быть меньше или равной нулю.')
@@ -65,5 +100,5 @@ def validate_non_empty_str(value: str, field_name: str) -> str:
 
 def validate_unique_name(value: str, exists: bool) -> str:
     if exists:
-        raise ValueError(f'Объект с именем "{value}" уже существует.')
+        raise ValueError(f'Объект с именем \'{value}\' уже существует.')
     return value
