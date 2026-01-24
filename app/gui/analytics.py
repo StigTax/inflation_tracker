@@ -6,6 +6,8 @@ from typing import Optional
 import pandas as pd
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+import matplotlib.dates as mdates
+from matplotlib.ticker import Formatter, Locator
 from PyQt6.QtCore import QDate
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -175,6 +177,11 @@ class AnalyticsWidget(QWidget):
         if idx >= 0:
             combo.setCurrentIndex(idx)
 
+    def _reset_axes(self) -> None:
+        # Полный reset состояния графика (локаторы/форматтеры/scale и т.п.)
+        self.figure.clear()
+        self.ax = self.figure.add_subplot(111)
+
     def _reset_unused_fields(
         self,
         *,
@@ -291,7 +298,9 @@ class AnalyticsWidget(QWidget):
             to_date = self.date_to.date().toPyDate()
             if from_date and to_date and from_date > to_date:
                 QMessageBox.information(
-                    self, "Ок", "Дата 'с' не может быть позже даты 'по'."
+                    self,
+                    "Ок",
+                    "Дата 'с' не может быть позже даты 'по'."
                 )
                 return
 
@@ -299,11 +308,11 @@ class AnalyticsWidget(QWidget):
         price_mode = self.price_mode.currentData() or "paid"
         promo_mode = self.promo_mode.currentData() or "include"
 
-        # Корзина всегда по месяцам (мониторинг скачков)
+        # Корзина — всегда месяц
         if kind == "basket_index":
             group_by = "month"
 
-        # ids теперь нужны только для store_index
+        # ids нужны только для store_index
         product_ids = None
         if kind == "store_index":
             try:
@@ -317,7 +326,9 @@ class AnalyticsWidget(QWidget):
                 product_id = self.product_combo.currentData()
                 if product_id is None:
                     QMessageBox.information(
-                        self, "Ок", "Сначала выбери продукт."
+                        self,
+                        "Ок",
+                        "Сначала выбери продукт."
                     )
                     return
 
@@ -339,7 +350,9 @@ class AnalyticsWidget(QWidget):
                 category_id = self.category_combo.currentData()
                 if category_id is None:
                     QMessageBox.information(
-                        self, "Ок", "Сначала выбери категорию."
+                        self,
+                        "Ок",
+                        "Сначала выбери категорию."
                     )
                     return
 
@@ -361,7 +374,9 @@ class AnalyticsWidget(QWidget):
                 store_id = self.store_combo.currentData()
                 if store_id is None:
                     QMessageBox.information(
-                        self, "Ок", "Сначала выбери магазин."
+                        self,
+                        "Ок",
+                        "Сначала выбери магазин."
                     )
                     return
 
@@ -391,14 +406,12 @@ class AnalyticsWidget(QWidget):
                 )
                 self._plot_index(
                     res,
-                    title="Моя инфляция (корзина, база=100)",
-                    group_by=group_by
+                    title="Моя инфляция (корзина, месяц, база=100)",
+                    group_by="month"
                 )
 
             elif kind == "contrib":
-                # Никаких ids — только top 10/20
                 top_n = int(self.contrib_top.currentData() or 10)
-
                 res = svc.inflation_contributions(
                     by=self.contrib_by.currentData() or "product",
                     from_date=from_date,
@@ -410,7 +423,8 @@ class AnalyticsWidget(QWidget):
                     top=top_n,
                 )
                 self._plot_contrib(
-                    res, title=f"Вклад в инфляцию (Top {top_n})"
+                    res,
+                    title=f"Вклад в инфляцию (Top {top_n})"
                 )
 
             elif kind == "cheapest":
@@ -437,7 +451,7 @@ class AnalyticsWidget(QWidget):
                 return
 
         except Exception as e:
-            self.ax.clear()
+            self._reset_axes()
             self.canvas.draw()
             self.kpi.setText("Ошибка при построении.")
             QMessageBox.critical(self, "Ошибка", str(e))
@@ -465,72 +479,152 @@ class AnalyticsWidget(QWidget):
         points = res.get("points") or []
         kpi = res.get("kpi")
 
-        self.ax.clear()
+        self._reset_axes()
 
         if not points:
             self.canvas.draw()
             self.kpi.setText("Нет данных под выбранные фильтры.")
             return
 
-        # собираем x/y безопасно
-        xs: list[str] = []
-        ys: list[float] = []
+        # Нормализуем group_by на случай если прилетит pandas-freq
+        gb = (group_by or "month").lower()
+        gb = {
+            "d": "day",
+            "w-mon": "week",
+            "w": "week",
+            "m": "month",
+            "ms": "month",
+            "y": "year",
+            "a": "year",
+        }.get(gb, gb)
+
+        # Собираем точки
+        rows: list[dict] = []
         for p in points:
             val = p.get("index_100")
             if val is None:
                 val = p.get("index")
             if val is None:
                 continue
-            xs.append(str(p.get("period")))
-            ys.append(float(val))
+            rows.append({"period": p.get("period"), "y": float(val)})
 
-        if not xs:
+        if not rows:
             self.canvas.draw()
             self.kpi.setText("Нет данных под выбранные фильтры.")
             return
 
-        x = pd.Series(pd.to_datetime(xs, errors="coerce"))
-        mask = x.notna()
-        x = x[mask]
-        ys = [y for y, ok in zip(ys, mask.to_list()) if ok]
+        dfp = pd.DataFrame(rows)
+        dfp["x"] = pd.to_datetime(dfp["period"], errors="coerce")
+        dfp = dfp.dropna(subset=["x"]).sort_values("x")
 
-        if x.empty:
+        if dfp.empty:
             self.canvas.draw()
             self.kpi.setText("Нет данных под выбранные фильтры.")
             return
 
-        # сортируем по времени (чтобы линия не прыгала)
-        dfp = pd.DataFrame({"x": x, "y": ys}).sort_values("x")
-        x_dt = pd.to_datetime(dfp["x"]).to_list()
-        y = dfp["y"].to_list()
+        x_dt = dfp["x"].dt.to_pydatetime().tolist()
+        y = dfp["y"].astype(float).tolist()
 
-        # рисуем
         self.ax.axhline(100, linestyle="--", linewidth=1)
         self.ax.plot(x_dt, y, marker="o")
         self.ax.set_title(title)
         self.ax.set_ylabel("Индекс")
         self.ax.grid(True)
 
-        # KPI (добавим полезную диагностику)
+        # ---- Локатор/форматтер под период ----
+        locator: Locator
+        formatter: Formatter
+        pad: pd.Timedelta
+
+        n = len(dfp)
+        tick_interval = max(1, n // 12)
+
+        if gb == "day":
+            locator = mdates.DayLocator(interval=tick_interval)
+            formatter = mdates.DateFormatter("%d.%m")
+            pad = pd.Timedelta(days=1)
+
+        elif gb == "week":
+            locator = mdates.WeekdayLocator(byweekday=mdates.MO, interval=tick_interval)
+            formatter = mdates.DateFormatter("%d.%m")
+            pad = pd.Timedelta(days=7)
+
+        elif gb == "month":
+            locator = mdates.MonthLocator(interval=tick_interval)
+            formatter = mdates.DateFormatter("%m.%Y")
+            pad = pd.Timedelta(days=31)
+
+        else:  # year
+            locator = mdates.YearLocator(base=tick_interval)
+            formatter = mdates.DateFormatter("%Y")
+            pad = pd.Timedelta(days=366)
+
+        self.ax.xaxis.set_major_locator(locator)
+        self.ax.xaxis.set_major_formatter(formatter)
+
+        # ---- Если точка одна — фикс лимитов, чтобы не улетало в эпохи ----
+        xmin = dfp["x"].min()
+        xmax = dfp["x"].max()
+        if xmin == xmax:
+            self.ax.set_xlim((xmin - pad).to_pydatetime(), (xmax + pad).to_pydatetime())
+        else:
+            self.ax.set_xlim(
+                (xmin - pad * 0.2).to_pydatetime(),
+                (xmax + pad * 0.2).to_pydatetime(),
+            )
+
+        self.figure.autofmt_xdate()
+        self.canvas.draw()
+
+        # KPI
         if isinstance(kpi, dict):
-            extra = [f"Точек: {len(dfp)}"]
+            extra = [f"Точек: {len(dfp)}", f"Период: {gb}"]
             if "coverage_last" in kpi:
-                extra.append(
-                    f'Покрытие (последний период): {kpi["coverage_last"]:.2f}'
-                )
+                extra.append(f'Покрытие (последний период): {kpi["coverage_last"]:.2f}')
             if "inflation_total" in kpi and kpi["inflation_total"] is not None:
-                extra.append(
-                    f'Инфляция от базы: {kpi["inflation_total"]:.2f} п.п.'
-                )
+                extra.append(f'Инфляция от базы: {kpi["inflation_total"]:.2f} п.п.')
             self.kpi.setText("\n".join(extra))
         else:
             self.kpi.setText(f"Готово. Точек: {len(dfp)}")
+
+    def _plot_cheapest(self, res: dict, *, title: str) -> None:
+        points = res.get("points") or []
+        kpi = res.get("kpi")
+
+        self._reset_axes()
+
+        if not points:
+            self.canvas.draw()
+            self.kpi.setText("Нет данных под выбранные фильтры.")
+            return
+
+        labels = [p["store"] for p in points]
+        vals = [float(p["avg_unit_price"]) for p in points]
+
+        self.ax.bar(labels, vals)
+        self.ax.set_title(title)
+        self.ax.set_ylabel("Цена за единицу")
+        self.ax.grid(True, axis="y")
+        self.ax.tick_params(axis="x", labelrotation=45)
+        self.canvas.draw()
+
+        if isinstance(kpi, dict):
+            best_avg = kpi.get("best_avg_unit_price")
+            best_avg_s = f"{best_avg:.2f}" if isinstance(
+                best_avg, (int, float)
+            ) else str(best_avg)
+            self.kpi.setText(
+                f'Магазинов: {kpi.get("stores")}\n'
+                f'Лучший: id={kpi.get("best_store_id")} (avg={best_avg_s})'
+            )
+        else:
+            self.kpi.setText("Готово.")
 
     def _plot_contrib(self, res: dict, *, title: str) -> None:
         points = res.get("points") or []
         kpi = res.get("kpi")
 
-        self.ax.clear()
+        self._reset_axes()
 
         if not points:
             self.canvas.draw()
@@ -558,42 +652,9 @@ class AnalyticsWidget(QWidget):
 
         if isinstance(kpi, dict):
             self.kpi.setText(
-                f'База: {kpi.get("base_period")}'
-                f'→ {kpi.get("target_period")}\n'
+                f'База: {kpi.get("base_period")} →'
+                f'{kpi.get("target_period")}\n'
                 f'Покрытый вес: {kpi.get("covered_weight")}'
-            )
-        else:
-            self.kpi.setText("Готово.")
-
-    def _plot_cheapest(self, res: dict, *, title: str) -> None:
-        points = res.get("points") or []
-        kpi = res.get("kpi")
-
-        self.ax.clear()
-
-        if not points:
-            self.canvas.draw()
-            self.kpi.setText("Нет данных под выбранные фильтры.")
-            return
-
-        labels = [p["store"] for p in points]
-        vals = [float(p["avg_unit_price"]) for p in points]
-
-        self.ax.bar(labels, vals)
-        self.ax.set_title(title)
-        self.ax.set_ylabel("Цена за единицу")
-        self.ax.grid(True, axis="y")
-        self.ax.tick_params(axis="x", labelrotation=45)
-        self.canvas.draw()
-
-        if isinstance(kpi, dict):
-            best_avg = kpi.get("best_avg_unit_price")
-            best_avg_s = f"{best_avg:.2f}" if isinstance(
-                best_avg, (int, float)
-            ) else str(best_avg)
-            self.kpi.setText(
-                f'Магазинов: {kpi.get("stores")}\n'
-                f'Лучший: id={kpi.get("best_store_id")} (avg={best_avg_s})'
             )
         else:
             self.kpi.setText("Готово.")
