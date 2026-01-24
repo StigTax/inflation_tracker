@@ -37,8 +37,8 @@ class AnalyticsWidget(QWidget):
         super().__init__(parent)
 
         # --- Верхняя панель (кнопки) ---
-        self.btn_data = QPushButton("Данные…")
-        self.btn_build = QPushButton("Построить")
+        self.btn_data = QPushButton('Данные…')
+        self.btn_build = QPushButton('Построить')
 
         self.btn_data.clicked.connect(self.open_data_manager)
         self.btn_build.clicked.connect(self.build)
@@ -51,7 +51,7 @@ class AnalyticsWidget(QWidget):
         # --- Левая панель параметров ---
         self.product_combo = QComboBox()
 
-        self.use_dates = QCheckBox("Фильтр по датам")
+        self.use_dates = QCheckBox('Фильтр по датам')
         self.date_from = QDateEdit()
         self.date_to = QDateEdit()
         self.date_from.setCalendarPopup(True)
@@ -69,22 +69,22 @@ class AnalyticsWidget(QWidget):
             self.group_combo.addItem(k, _GROUP_FREQ[k])
 
         self.price_mode = QComboBox()
-        self.price_mode.addItem("Как заплатил (paid)", "paid")
-        self.price_mode.addItem("Обычная цена (regular)", "regular")
+        self.price_mode.addItem('Как заплатил (paid)', 'paid')
+        self.price_mode.addItem('Обычная цена (regular)', 'regular')
 
         self.promo_mode = QComboBox()
-        self.promo_mode.addItem("Включая акции", "include")
-        self.promo_mode.addItem("Без акций", "exclude")
-        self.promo_mode.addItem("Только акции", "only")
+        self.promo_mode.addItem('Включая акции', 'include')
+        self.promo_mode.addItem('Без акций', 'exclude')
+        self.promo_mode.addItem('Только акции', 'only')
 
         left_form = QFormLayout()
-        left_form.addRow("Продукт:", self.product_combo)
-        left_form.addRow("", self.use_dates)
-        left_form.addRow("с:", self.date_from)
-        left_form.addRow("по:", self.date_to)
-        left_form.addRow("Группировка:", self.group_combo)
-        left_form.addRow("Режим цены:", self.price_mode)
-        left_form.addRow("Акции:", self.promo_mode)
+        left_form.addRow('Продукт:', self.product_combo)
+        left_form.addRow('', self.use_dates)
+        left_form.addRow('с:', self.date_from)
+        left_form.addRow('по:', self.date_to)
+        left_form.addRow('Группировка:', self.group_combo)
+        left_form.addRow('Режим цены:', self.price_mode)
+        left_form.addRow('Акции:', self.promo_mode)
 
         left = QWidget()
         left.setLayout(left_form)
@@ -94,7 +94,7 @@ class AnalyticsWidget(QWidget):
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
 
-        self.kpi = QLabel("Выбери параметры и нажми «Построить».")
+        self.kpi = QLabel('Выбери параметры и нажми «Построить».')
         self.kpi.setWordWrap(True)
 
         right = QVBoxLayout()
@@ -125,23 +125,22 @@ class AnalyticsWidget(QWidget):
 
     def reload_products(self) -> None:
         self.product_combo.clear()
-        self.product_combo.addItem("— выбери продукт —", None)
+        self.product_combo.addItem('— выбери продукт —', None)
         products = list_items(product_crud, limit=5000)
         for p in products:
-            unit = f"{p.unit.measure_type} {p.unit.unit}" if p.unit else ""
-            self.product_combo.addItem(f"{p.name} ({unit}) (id={p.id})", p.id)
+            unit = f'{p.unit.measure_type} {p.unit.unit}' if p.unit else ''
+            self.product_combo.addItem(f'{p.name} ({unit}) (id={p.id})', p.id)
 
     def open_data_manager(self) -> None:
         dlg = DataManagerDialog(self)
         dlg.exec()
 
-        # после закрытия — обновим справочники и, при желании, график
         self.reload_products()
 
     def build(self) -> None:
         product_id = self.product_combo.currentData()
         if product_id is None:
-            QMessageBox.information(self, "Ок", "Сначала выбери продукт.")
+            QMessageBox.information(self, 'Ок', 'Сначала выбери продукт.')
             return
 
         from_date = None
@@ -152,9 +151,9 @@ class AnalyticsWidget(QWidget):
 
         promo_mode = self.promo_mode.currentData()
         is_promo = None
-        if promo_mode == "exclude":
+        if promo_mode == 'exclude':
             is_promo = False
-        elif promo_mode == "only":
+        elif promo_mode == 'only':
             is_promo = True
 
         price_mode = self.price_mode.currentData()
@@ -170,40 +169,40 @@ class AnalyticsWidget(QWidget):
         if not purchases:
             self.ax.clear()
             self.canvas.draw()
-            self.kpi.setText("Нет данных под выбранные фильтры.")
+            self.kpi.setText('Нет данных под выбранные фильтры.')
             return
 
         df = pd.DataFrame([p.to_dict() for p in purchases])
-        df["purchase_date"] = pd.to_datetime(df["purchase_date"])
-        df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce")
-        df["total_price"] = pd.to_numeric(df["total_price"], errors="coerce")
-        df["unit_price"] = pd.to_numeric(df["unit_price"], errors="coerce")
-        df["regular_unit_price"] = pd.to_numeric(
-            df["regular_unit_price"],
-            errors="coerce"
+        df['purchase_date'] = pd.to_datetime(df['purchase_date'])
+        df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')
+        df['total_price'] = pd.to_numeric(df['total_price'], errors='coerce')
+        df['unit_price'] = pd.to_numeric(df['unit_price'], errors='coerce')
+        df['regular_unit_price'] = pd.to_numeric(
+            df['regular_unit_price'],
+            errors='coerce'
         )
 
-        if price_mode == "paid":
-            df["effective_total"] = df["total_price"]
+        if price_mode == 'paid':
+            df['effective_total'] = df['total_price']
         else:
-            eff_unit = df["regular_unit_price"].fillna(df["unit_price"])
-            df["effective_total"] = eff_unit * df["quantity"]
+            eff_unit = df['regular_unit_price'].fillna(df['unit_price'])
+            df['effective_total'] = eff_unit * df['quantity']
 
-        df = df.set_index("purchase_date").sort_index()
+        df = df.set_index('purchase_date').sort_index()
 
         agg = df.resample(freq).agg(
-            total=("effective_total", "sum"),
-            qty=("quantity", "sum"),
-            n=("id", "count"),
+            total=('effective_total', 'sum'),
+            qty=('quantity', 'sum'),
+            n=('id', 'count'),
         )
-        agg["avg_unit_price"] = agg["total"] / agg["qty"]
-        agg = agg.dropna(subset=["avg_unit_price"])
+        agg['avg_unit_price'] = agg['total'] / agg['qty']
+        agg = agg.dropna(subset=['avg_unit_price'])
 
         if agg.empty:
             self.ax.clear()
             self.canvas.draw()
             self.kpi.setText(
-                "После агрегации данных не осталось (проверь количество/цены)."
+                'После агрегации данных не осталось (проверь количество/цены).'
             )
             return
 
@@ -218,33 +217,33 @@ class AnalyticsWidget(QWidget):
 
         if len(agg) == 1:
             # одна точка — рисуем точкой и ужимаем X
-            self.ax.scatter(agg.index, agg["index_100"])
+            self.ax.scatter(agg.index, agg['index_100'])
             x = agg.index[0]
             self.ax.set_xlim(
                 x - pd.Timedelta(days=20),
                 x + pd.Timedelta(days=20)
             )
         else:
-            self.ax.plot(agg.index, agg["index_100"], marker="o")
+            self.ax.plot(agg.index, agg['index_100'], marker='o')
 
-        self.ax.set_title("Индекс инфляции по продукту (база=100)")
-        self.ax.set_ylabel("Индекс")
+        self.ax.set_title('Индекс инфляции по продукту (база=100)')
+        self.ax.set_ylabel('Индекс')
         self.ax.grid(True)
         self.figure.tight_layout()
         self.canvas.draw()
 
         periods = len(agg)
         if periods < 2:
-            inflation_text = "— (нужны минимум 2 периода)"
+            inflation_text = '— (нужны минимум 2 периода)'
         else:
-            inflation_text = f"{inflation_pct:.2f}%"
+            inflation_text = f'{inflation_pct:.2f}'
 
         data_start = df.index.min().date().isoformat()
         data_end = df.index.max().date().isoformat()
         self.kpi.setText(
-            f"Период: {data_start} — {data_end}\n"
-            f"База: {base:.2f}\n"
-            f"Текущая: {last:.2f}\n"
-            f"Инфляция за период: {inflation_text}%\n"
-            f"Записей: {int(agg['n'].sum())}"
+            f'Период: {data_start} — {data_end}\n'
+            f'База: {base:.2f}\n'
+            f'Текущая: {last:.2f}\n'
+            f'Инфляция за период: {inflation_text}%\n'
+            f'Записей: {int(agg["n"].sum())}'
         )

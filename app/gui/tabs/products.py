@@ -60,14 +60,12 @@ class ProductDialog(QDialog):
         # Категория: может быть None
         self.category_combo.addItem('— без категории —', None)
         for c in categories:
-            self.category_combo.addItem(f'{c.name}')
+            self.category_combo.addItem(c.name, c.id)
 
         # Единица: обязана быть
         self.unit_combo.addItem('— выбери единицу —', None)
         for u in units:
-            self.unit_combo.addItem(
-                f'{u.measure_type} ({u.unit})'
-            )
+            self.unit_combo.addItem(f'{u.measure_type} ({u.unit})', u.id)
 
         # Проставляем текущие значения (если редактирование)
         _set_combo_by_data(self.category_combo, category_id)
@@ -113,7 +111,7 @@ class ProductDialog(QDialog):
         name = self.name_edit.text().strip()
         category_id = self.category_combo.currentData()
         unit_id = self.unit_combo.currentData()
-        return name, category_id, int(unit_id)
+        return name, category_id, unit_id
 
 
 class ProductsTab(QWidget):
@@ -165,14 +163,14 @@ class ProductsTab(QWidget):
         rows = []
         for p in items:
             rows.append({
-                "id": p.id,
-                "name": p.name,
-                "category": p.category.name if p.category else "—",
-                "measure_type": p.unit.measure_type if p.unit else "—",
-                "unit": p.unit.unit if p.unit else "—",
+                'id': p.id,
+                'name': p.name,
+                'category': p.category.name if p.category else '—',
+                'measure_type': p.unit.measure_type if p.unit else '—',
+                'unit': p.unit.unit if p.unit else '—',
 
-                "category_id": p.category_id,
-                "unit_id": p.unit_id,
+                'category_id': p.category_id,
+                'unit_id': p.unit_id,
             })
 
         self.model.set_rows(rows)
@@ -248,7 +246,7 @@ class ProductsTab(QWidget):
 
         ok = QMessageBox.question(
             self,
-            "Подтверждение",
+            'Подтверждение',
             f'Удалить продукт "{row.get("name")}" (id={row["id"]})?',
         )
         if ok != QMessageBox.StandardButton.Yes:
@@ -257,7 +255,7 @@ class ProductsTab(QWidget):
         try:
             delete_item(
                 product_crud,
-                row["id"],
+                row['id'],
                 guards=[product_has_no_purchases]
             )
             self.reload()
