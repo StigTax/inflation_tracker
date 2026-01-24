@@ -18,6 +18,20 @@ from app.service.safe_delete import delete_category
 def register_category_commands(
     subparsers: argparse._SubParsersAction,
 ) -> None:
+    """Зарегистрировать CLI-команды для сущности Category.
+
+    Регистрирует набор CRUD-команд для категорий через
+    `register_crud_commands`, включая аргументы для
+    `add/update/list/get/delete`, табличный вывод и
+    безопасное удаление через `delete_category` (учитывает связи).
+
+    Args:
+        subparsers: Коллекция сабпарсеров верхнего уровня
+        (после выбора сущности).
+
+    Returns:
+        None
+    """
     spec = CrudCommandSpec(
         command='category',
         help='Управление категориями покупок.',

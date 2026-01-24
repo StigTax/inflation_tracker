@@ -29,6 +29,18 @@ CountBy = Literal['product', 'category', 'store']
 
 
 def _ensure_group_by(group_by: str) -> GroupBy:
+    """Провалидировать тип группировки периода.
+
+    Args:
+        group_by: Строковый идентификатор периода
+        ("day", "week", "month", "year").
+
+    Returns:
+        GroupBy: То же значение, но с типом Literal для статической типизации.
+
+    Raises:
+        ValueError: Если передано неизвестное значение.
+    """
     if group_by not in {'day', 'week', 'month', 'year'}:
         raise ValueError(
             'group_by должен быть одним из: day, week, month, year')
@@ -36,26 +48,51 @@ def _ensure_group_by(group_by: str) -> GroupBy:
 
 
 def _ensure_price_mode(price_mode: str) -> PriceMode:
+    """Провалидировать режим цены для расчётов.
+
+    Args:
+        price_mode: "paid" (фактически оплаченная) или "regular" (обычная).
+
+    Returns:
+        PriceMode: Валидированное значение режима.
+
+    Raises:
+        ValueError: Если режим не "paid" и не "regular".
+    """
     if price_mode not in {'paid', 'regular'}:
         raise ValueError('price_mode должен быть paid или regular')
     return price_mode  # type: ignore[return-value]
 
 
 def _ensure_promo_mode(promo_mode: str) -> PromoMode:
+    """Провалидировать режим учёта акций.
+
+    Args:
+        promo_mode: "include" (учитывать все), "exclude" (исключить акции),
+            "only" (только акции).
+
+    Returns:
+        PromoMode: Валидированное значение режима.
+
+    Raises:
+        ValueError: Если режим не входит в допустимый набор.
+    """
     if promo_mode not in {'include', 'exclude', 'only'}:
         raise ValueError('promo_mode должен быть include/exclude/only')
     return promo_mode  # type: ignore[return-value]
 
 
 def _period_start(dts: pd.Series, group_by: GroupBy) -> pd.Series:
-    """Возвращает дату начала периода.
+    """Преобразовать список покупок в pandas.DataFrame.
+
+    Ожидается, что объекты поддерживают `to_dict()`. Если список пустой
+    или нет ключевой колонки `purchase_date`, возвращает пустой датафрейм.
 
     Args:
-        dts: Серия дат/времени.
-        group_by: Тип группировки периода.
+        purchases: Список объектов Purchase (или совместимых DTO).
 
     Returns:
-        pd.Series: Серия дат начала периода (datetime64[ns]).
+        pd.DataFrame: Датафрейм по покупкам или пустой датафрейм.
     """
     dts = pd.to_datetime(dts).dt.normalize()
 
@@ -74,6 +111,17 @@ def _period_start(dts: pd.Series, group_by: GroupBy) -> pd.Series:
 
 
 def _purchases_to_df(purchases: list[Any]) -> pd.DataFrame:
+    """Преобразовать список покупок в pandas.DataFrame.
+
+    Ожидается, что объекты поддерживают `to_dict()`. Если список пустой
+    или нет ключевой колонки `purchase_date`, возвращает пустой датафрейм.
+
+    Args:
+        purchases: Список объектов Purchase (или совместимых DTO).
+
+    Returns:
+        pd.DataFrame: Датафрейм по покупкам или пустой датафрейм.
+    """
     if not purchases:
         return pd.DataFrame()
 
@@ -91,6 +139,23 @@ def _apply_promo_filter(
     df: pd.DataFrame,
     promo_mode: PromoMode
 ) -> pd.DataFrame:
+    """Отфильтровать покупки по режиму учёта акций.
+
+    - include: вернуть всё как есть
+    - exclude: убрать строки, где is_promo=True
+    - only: оставить только строки, где is_promo=True
+
+    Если колонки `is_promo` нет:
+    - для only возвращает пустой датафрейм,
+    - иначе возвращает df без изменений.
+
+    Args:
+        df: Датафрейм покупок.
+        promo_mode: Режим учёта акций.
+
+    Returns:
+        pd.DataFrame: Отфильтрованный датафрейм.
+    """
     if df.empty:
         return df
 
@@ -110,14 +175,27 @@ def _compute_price_and_spend(
     df: pd.DataFrame,
     price_mode: PriceMode
 ) -> pd.DataFrame:
-    """Добавляет расчетные цены и затраты.
+    """Добавить расчетные колонки цены и затрат для аналитики.
+
+    Создаёт:
+    - `unit_price_used` — цена за единицу, используемая в расчётах,
+    - `spend` — затраты (= unit_price_used * quantity).
+
+    При этом чистит данные:
+    - quantity приводится к числу и фильтруется > 0;
+    - цена приводится к числу и фильтруется > 0.
+
+    Режимы:
+    - paid: берёт `unit_price`
+    - regular: берёт `regular_unit_price`, если есть, иначе `unit_price`
 
     Args:
-        df: Датафрейм с покупками.
-        price_mode: Режим расчета цены.
+        df: Датафрейм покупок.
+        price_mode: Режим цены ("paid" или "regular").
 
     Returns:
-        pd.DataFrame: Датафрейм с колонками unit_price_used и spend.
+        pd.DataFrame: Датафрейм с добавленными колонками или пустойv
+        (если данных мало).
     """
     if df.empty:
         return df
@@ -171,6 +249,35 @@ def _prepare_df_for_index(
     price_mode: PriceMode,
     group_by: GroupBy,
 ) -> pd.DataFrame:
+    """Собрать и подготовить датафрейм покупок для расчёта индексов.
+
+    Делает полный пайплайн:
+    1) выгружает покупки из БД через `list_purchases_filtered`;
+    2) преобразует в DataFrame;
+    3) применяет фильтр промо;
+    4) рассчитывает unit_price_used/spend;
+    5) добавляет колонку `period` (начало периода группировки);
+    6) нормализует `product_id` (для индексов он обязателен).
+
+    Оптимизация:
+    - если `promo_mode == "only"`, на уровне БД ставит `is_promo=True`
+    (меньше данных).
+
+    Args:
+        from_date: Начальная дата периода.
+        to_date: Конечная дата периода.
+        store_id: ID магазина.
+        product_id: ID продукта.
+        product_ids: Список ID продуктов (корзина).
+        category_id: ID категории.
+        promo_mode: Режим учёта акций.
+        price_mode: Режим цены.
+        group_by: Группировка по периоду.
+
+    Returns:
+        pd.DataFrame: Подготовленный датафрейм или пустой,
+        если данных недостаточно.
+    """
     is_promo_db = True if promo_mode == 'only' else None
 
     purchases = list_purchases_filtered(
@@ -209,17 +316,28 @@ def _laspeyres_index(
     *,
     base_period: Optional[pd.Timestamp] = None,
 ) -> dict[str, Any]:
-    """Считает индекс Ласпейреса с весами базового периода.
+    """Посчитать индекс Ласпейреса по корзине товаров.
 
-    Если в периоде нет данных по части товаров, индекс считается по
-    доступной части корзины и возвращается coverage.
+    Весами выступают затраты базового периода (p0 * q0).
+    Если в текущем периоде нет части товаров, индекс считается по пересечению
+    доступных товаров и возвращается coverage (доля покрытого веса базы).
 
     Args:
-        df: Подготовленный датафрейм покупок.
-        base_period: Базовый период для весов.
+        df: Подготовленный датафрейм (с period, product_id, quantity, spend).
+        base_period: Базовый период; если None — берётся минимальный период в
+        df.
 
     Returns:
-        dict[str, Any]: Точки индекса и KPI.
+        dict[str, Any]: Структура вида:
+            {
+              "points": [{
+                    "period": "...",
+                    "index": 123.4,
+                    "coverage": 0.9,
+                    "items": 12}, ...
+              ],
+              "kpi": {...}
+            }
     """
     if df.empty:
         return {
@@ -347,6 +465,14 @@ def _laspeyres_index(
 
 
 def purchase_counts(*, by: CountBy) -> dict[int, int]:
+    """Посчитать количество покупок по сущности (для UI и быстрых подсказок).
+
+    Args:
+        by: Группировка счётчика: "product", "store" или "category".
+
+    Returns:
+        dict[int, int]: Словарь {id: count}.
+    """
     with get_session() as db:
         if by == 'product':
             stmt = (
@@ -381,6 +507,23 @@ def product_inflation_index(
     price_mode: PriceMode = 'paid',
     promo_mode: PromoMode = 'include',
 ) -> dict[str, Any]:
+    """Посчитать индекс инфляции для одного продукта по периодам.
+
+    Для каждого периода считает среднюю цену за единицу (через spend/qty),
+    затем нормирует к 100 по первому периоду.
+
+    Args:
+        product_id: ID продукта.
+        from_date: Начальная дата.
+        to_date: Конечная дата.
+        group_by: Период группировки.
+        price_mode: Режим цены (paid/regular).
+        promo_mode: Режим учёта акций.
+
+    Returns:
+        dict[str, Any]: {"points": [...], "kpi": {...}} или пустые структуры
+        при отсутствии данных.
+    """
     group_by = _ensure_group_by(group_by)
     price_mode = _ensure_price_mode(price_mode)
     promo_mode = _ensure_promo_mode(promo_mode)
@@ -468,15 +611,15 @@ def basket_inflation_index(
     price_mode: PriceMode = 'paid',
     promo_mode: PromoMode = 'include',
 ) -> dict[str, Any]:
-    """Считает индекс по выбранной корзине продуктов.
+    """Посчитать индекс инфляции по корзине выбранных продуктов (Ласпейрес).
 
     Args:
-        from_date: Дата начала периода.
-        to_date: Дата окончания периода.
-        product_ids: Список продуктов для корзины.
-        group_by: Группировка по периоду.
+        from_date: Начальная дата.
+        to_date: Конечная дата.
+        product_ids: Список продуктов корзины.
+        group_by: Период группировки.
         price_mode: Режим цены.
-        promo_mode: Режим учета акций.
+        promo_mode: Режим учёта акций.
 
     Returns:
         dict[str, Any]: Точки индекса и KPI.
@@ -505,15 +648,15 @@ def category_inflation_index(
     price_mode: PriceMode = 'paid',
     promo_mode: PromoMode = 'include',
 ) -> dict[str, Any]:
-    """Считает индекс инфляции внутри категории.
+    """Посчитать индекс инфляции внутри категории (Ласпейрес).
 
     Args:
-        category_id: Идентификатор категории.
-        from_date: Дата начала периода.
-        to_date: Дата окончания периода.
-        group_by: Группировка по периоду.
+        category_id: ID категории.
+        from_date: Начальная дата.
+        to_date: Конечная дата.
+        group_by: Период группировки.
         price_mode: Режим цены.
-        promo_mode: Режим учета акций.
+        promo_mode: Режим учёта акций.
 
     Returns:
         dict[str, Any]: Точки индекса и KPI.
@@ -543,18 +686,18 @@ def store_inflation_index(
     price_mode: PriceMode = 'paid',
     promo_mode: PromoMode = 'include',
 ) -> dict[str, Any]:
-    """Считает индекс инфляции по магазину.
+    """Посчитать индекс инфляции по магазину (Ласпейрес).
 
-    Можно ограничить корзину product_ids.
+    Можно ограничить расчёт корзиной `product_ids`.
 
     Args:
-        store_id: Идентификатор магазина.
-        from_date: Дата начала периода.
-        to_date: Дата окончания периода.
-        product_ids: Список продуктов для корзины.
-        group_by: Группировка по периоду.
+        store_id: ID магазина.
+        from_date: Начальная дата.
+        to_date: Конечная дата.
+        product_ids: Список продуктов корзины.
+        group_by: Период группировки.
         price_mode: Режим цены.
-        promo_mode: Режим учета акций.
+        promo_mode: Режим учёта акций.
 
     Returns:
         dict[str, Any]: Точки индекса и KPI.
@@ -583,19 +726,21 @@ def product_store_price_stats(
     price_mode: PriceMode = 'paid',
     promo_mode: PromoMode = 'include',
 ) -> dict[str, Any]:
-    """Возвращает средние цены по магазинам для продукта.
+    """Посчитать статистику цен по магазинам для одного продукта.
 
-    Результат отсортирован по средней цене.
+    Возвращает магазины, отсортированные по средней цене за единицу.
+    Внутри каждого магазина считает min/max/avg, количество покупок и
+    последнюю дату.
 
     Args:
-        product_id: Идентификатор продукта.
-        from_date: Дата начала периода.
-        to_date: Дата окончания периода.
-        price_mode: Режим цены.
-        promo_mode: Режим учета акций.
+        product_id: ID продукта.
+        from_date: Начальная дата.
+        to_date: Конечная дата.
+        price_mode: Режим цены (paid/regular).
+        promo_mode: Режим учёта акций.
 
     Returns:
-        dict[str, Any]: Статистика по магазинам и KPI.
+        dict[str, Any]: {"points": [...], "kpi": {...}}.
     """
     price_mode = _ensure_price_mode(price_mode)
     promo_mode = _ensure_promo_mode(promo_mode)
@@ -678,22 +823,30 @@ def inflation_contributions(
     promo_mode: PromoMode = 'include',
     top: int = 10,
 ) -> dict[str, Any]:
-    """Считает вклад в инфляцию относительно базового периода.
+    """Посчитать вклад товаров/категорий в инфляцию относительно базового
+    периода.
+
+    Логика:
+    - базовый период = первый период в данных;
+    - целевой период = последний период;
+    - веса = затраты базового периода (p0 * q0);
+    - вклад товара в пунктах индекса (Index-100):
+      share_w * (price_ratio - 1) * 100.
 
     Args:
-        by: Группировка вклада (product/category).
-        from_date: Дата начала периода.
-        to_date: Дата окончания периода.
-        product_ids: Список продуктов для корзины.
-        store_id: Идентификатор магазина.
-        category_id: Идентификатор категории.
-        group_by: Группировка по периоду.
+        by: Группировать вклад по "product" или "category".
+        from_date: Начальная дата.
+        to_date: Конечная дата.
+        product_ids: Корзина продуктов (если задана).
+        store_id: Ограничение по магазину.
+        category_id: Ограничение по категории.
+        group_by: Период группировки.
         price_mode: Режим цены.
-        promo_mode: Режим учета акций.
-        top: Сколько лидеров вернуть.
+        promo_mode: Режим учёта акций.
+        top: Сколько лидеров по вкладу вернуть.
 
     Returns:
-        dict[str, Any]: Список вкладов и KPI.
+        dict[str, Any]: {"points": [...], "kpi": {...}}.
     """
     group_by = _ensure_group_by(group_by)
     price_mode = _ensure_price_mode(price_mode)

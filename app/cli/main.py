@@ -13,6 +13,15 @@ logger = logging.getLogger(__name__)
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Собрать argparse-парсер для CLI приложения.
+
+    Создаёт корневой парсер `inflation`, добавляет общие опции подключения к БД
+    (`--db-url`, `--echo-sql`) и регистрирует подкоманды для сущностей проекта:
+    категории, магазины, единицы измерения, продукты и покупки.
+
+    Returns:
+        argparse.ArgumentParser: Настроенный парсер верхнего уровня.
+    """
     parser = argparse.ArgumentParser(
         prog='inflation',
         description='CLI для тестирования CRUD слоёв проекта.',
@@ -44,6 +53,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main():
+    """Точка входа CLI.
+
+    Настраивает логирование, парсит аргументы, инициализирует БД и выполняет
+    обработчик команды (`args.func`). При любой ошибке пишет контекст
+    (entity/action)
+    в лог и завершает процесс через `SystemExit`.
+
+    Raises:
+        SystemExit: Если выполнение команды завершилось исключением.
+    """
     configure_logging()
     parser = build_parser()
     args = parser.parse_args()

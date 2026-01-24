@@ -16,6 +16,19 @@ from app.service.safe_delete import delete_store
 
 
 def register_store_commands(subparsers: argparse._SubParsersAction) -> None:
+    """Зарегистрировать CLI-команды для сущности Store.
+
+    Регистрирует CRUD-команды для магазинов через `register_crud_commands`,
+    добавляет аргументы для создания/обновления, табличный вывод и безопасное
+    удаление через `delete_store`.
+
+    Args:
+        subparsers: Коллекция сабпарсеров верхнего уровня
+        (после выбора сущности).
+
+    Returns:
+        None
+    """
     spec = CrudCommandSpec(
         command='store',
         help='Управление магазинами.',

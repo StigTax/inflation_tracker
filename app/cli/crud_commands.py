@@ -69,6 +69,26 @@ def register_crud_commands(
     subparsers: argparse._SubParsersAction,
     spec: CrudCommandSpec,
 ) -> None:
+    """Зарегистрировать набор CRUD-команд для сущности в CLI.
+
+    Создаёт подкоманду `spec.command` и добавляет действия:
+    - `add`    — создание объекта,
+    - `list`   — список объектов (таблица по умолчанию, либо `--full`),
+    - `get`    — получить объект по `id`,
+    - `update` — обновить объект по `id`,
+    - `delete` — удалить объект по `id`.
+
+    Обработчики действий собираются из `spec.*_fn`, либо из стандартного
+    сервисного слоя (`create_item`, `list_items`, `get_item`, `update_item`,
+    `delete_item`).
+
+    Args:
+        subparsers: Subparsers верхнего уровня (после выбора сущности).
+        spec: Спецификация сущности и правил CLI для неё.
+
+    Returns:
+        None
+    """
     pars = subparsers.add_parser(
         spec.command, help=spec.help,
     )
@@ -142,6 +162,23 @@ def register_crud_commands(
 def _make_cmd_add(
     spec: CrudCommandSpec
 ):
+    """Собрать обработчик CLI-команды `add` для указанной сущности.
+
+    Возвращает функцию-коллбек для argparse, которая создаёт объект:
+    - через `spec.create_fn(args)`, если задана кастомная логика;
+    - иначе — собирает payload по `spec.create_fields`,
+      создаёт `spec.model_cls(**payload)` и сохраняет через `create_item(...)`.
+
+    При `spec.refresh_after_write=True` перечитывает объект из БД (актуально,
+    когда нужно подтянуть связанные поля/вычисляемые значения).
+
+    Args:
+        spec: Спецификация CRUD-команд для сущности.
+
+    Returns:
+        Callable[[argparse.Namespace], None]: Коллбек,
+        который выполняет создание и печать результата.
+    """
     def cmd(
         args: argparse.Namespace
     ) -> None:
@@ -167,7 +204,33 @@ def _make_cmd_add(
 
 
 def _make_cmd_list(spec: CrudCommandSpec):
+    """Собрать обработчик CLI-команды `list` для указанной сущности.
+
+    Коллбек получает список объектов:
+    - через `spec.list_fn(args)`, если задана кастомная выборка;
+    - иначе — через `list_items(...)` с пагинацией и сортировкой.
+
+    Режимы вывода:
+    - `--full` печатает каждый объект как `key: value`
+      (через `print_list_verbose`);
+    - по умолчанию печатает таблицу (через `print_table`).
+
+    Args:
+        spec: Спецификация CRUD-команд для сущности.
+
+    Returns:
+        Callable[[argparse.Namespace], None]:
+        Коллбек, который выполняет выборку и вывод списка.
+    """
     def cmd(args: argparse.Namespace) -> None:
+        """Обработчик CLI-действия (коллбек argparse).
+
+        Args:
+            args: Аргументы, распарсенные argparse для текущей команды.
+
+        Returns:
+            None
+        """
         if spec.list_fn is not None:
             items = spec.list_fn(args)
         else:
@@ -193,6 +256,17 @@ def _make_cmd_list(spec: CrudCommandSpec):
 
 
 def _make_cmd_get(spec: CrudCommandSpec):
+    """Собрать обработчик CLI-команды `get` (получить объект по ID).
+
+    Использует `spec.get_fn`, если он задан; иначе вызывает `get_item(...)`.
+
+    Args:
+        spec: Спецификация CRUD-команд для сущности.
+
+    Returns:
+        Callable[[argparse.Namespace], None]:
+            Коллбек, который печатает найденный объект.
+    """
     def cmd(args: argparse.Namespace) -> None:
         getter = spec.get_fn or (
             lambda obj_id: get_item(crud=spec.crud, item_id=obj_id)
@@ -204,6 +278,24 @@ def _make_cmd_get(spec: CrudCommandSpec):
 
 
 def _make_cmd_update(spec: CrudCommandSpec):
+    """Собрать обработчик CLI-команды `update` для указанной сущности.
+
+    Если задан `spec.update_fn`, используется он.
+    Иначе собираются только те поля из `spec.update_fields`, которые реально
+    переданы (то есть `getattr(args, field) is not None`) — чтобы не затирать
+    значения `None`-ами.
+    Далее выполняется `update_item(...)`.
+
+    При `spec.refresh_after_write=True` перечитывает объект из БД перед
+    выводом.
+
+    Args:
+        spec: Спецификация CRUD-команд для сущности.
+
+    Returns:
+        Callable[[argparse.Namespace], None]:
+            Коллбек, который выполняет обновление и печатает результат.
+    """
     def cmd(args: argparse.Namespace) -> None:
         if spec.update_fn is not None:
             updated = spec.update_fn(args)
@@ -232,6 +324,20 @@ def _make_cmd_update(spec: CrudCommandSpec):
 
 
 def _make_cmd_delete(spec: CrudCommandSpec):
+    """Собрать обработчик CLI-команды `delete` для указанной сущности.
+
+    Если задан `spec.delete_fn`, используется он
+    (обычно для “безопасного удаления”).
+    Иначе вызывается `delete_item(...)`.
+    После успешного удаления печатает `OK deleted id=...`.
+
+    Args:
+        spec: Спецификация CRUD-команд для сущности.
+
+    Returns:
+        Callable[[argparse.Namespace], None]:
+            Коллбек, который выполняет удаление и печатает подтверждение.
+    """
     def cmd(args: argparse.Namespace) -> None:
         if spec.delete_fn is not None:
             spec.delete_fn(args.id)

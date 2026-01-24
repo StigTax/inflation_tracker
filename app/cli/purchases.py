@@ -28,6 +28,19 @@ from app.service.purchases import (
 def _create(
     args: argparse.Namespace
 ) -> Purchase:
+    """Создать покупку по аргументам CLI.
+
+    Преобразует распарсенные аргументы в параметры `create_purchase(...)`.
+    Используется как `create_fn` в `CrudCommandSpec`
+    для команды `purchase add`.
+
+    Args:
+        args: Namespace с полями покупки (product_id, store_id, quantity,
+        total_price, date, comment, promo, promo_type, regular_unit_price).
+
+    Returns:
+        Purchase: Созданная запись покупки.
+    """
     return create_purchase(
         store_id=args.store_id,
         product_id=args.product_id,
@@ -42,6 +55,29 @@ def _create(
 
 
 def _update(args: argparse.Namespace) -> Purchase:
+    """Обновить покупку по аргументам CLI.
+
+    Валидирует взаимоисключающие флаги промо:
+    - запрещает одновременное использование `--promo` и `--no-promo`;
+    - запрещает передачу `--promo-type/--regular-unit-price` вместе с
+      `--no-promo`.
+
+    Затем формирует три-состояния `is_promo`:
+    - `True`, если передан `--promo`;
+    - `False`, если передан `--no-promo`;
+    - `None`, если флаги не переданы (не менять текущее значение).
+
+    Args:
+        args: Namespace с полями обновления (id, product_id, store_id,
+            quantity, total_price, comment, date, promo/no_promo, promo_type,
+            regular_unit_price).
+
+    Returns:
+        Purchase: Обновлённая запись покупки.
+
+    Raises:
+        ValueError: Если переданы конфликтующие флаги/аргументы промо.
+    """
     if args.promo and args.no_promo:
         raise ValueError('Нельзя одновременно --promo и --no-promo')
 
@@ -73,6 +109,30 @@ def _update(args: argparse.Namespace) -> Purchase:
 
 
 def _list(args: argparse.Namespace) -> list[Purchase]:
+    """Получить список покупок по фильтрам CLI.
+
+    Поддерживает фильтрацию по промо-статусу:
+    - `--promo-only`  -> только акционные;
+    - `--no-promo-only` -> только неакционные.
+    Одновременное использование этих флагов запрещено.
+
+    Приоритет фильтров:
+    1) если задан `--product-id`, возвращает покупки продукта в диапазоне дат;
+    2) если задан `--store-id`, возвращает покупки магазина и дополнительно
+       фильтрует по датам;
+    3) иначе — общий список с пагинацией и сортировкой (`list_purchases`).
+
+    Args:
+        args: Namespace с параметрами `list` (offset, limit, order, product_id,
+            store_id, from_date, to_date, promo_only, no_promo_only).
+
+    Returns:
+        list[Purchase]: Список покупок по заданным условиям.
+
+    Raises:
+        ValueError: Если одновременно переданы
+        `--promo-only` и `--no-promo-only`.
+    """
     promo_filter = None
     if args.promo_only and args.no_promo_only:
         raise ValueError('Нельзя одновременно --promo-only и --no-promo-only')
@@ -116,6 +176,28 @@ def _list(args: argparse.Namespace) -> list[Purchase]:
 def register_purchase_commands(
     subparsers: argparse._SubParsersAction
 ) -> None:
+    """Зарегистрировать CLI-команды для сущности Purchase (покупки).
+
+    Регистрирует CRUD-команды для покупок через `register_crud_commands` и
+    добавляет:
+    - расширенные аргументы для `add/update` (промо-флаги и поля);
+    - расширенные аргументы для `list`
+      (фильтры по продукту/магазину/датам/промо);
+    - табличный вывод с ключевыми полями покупки.
+
+    Для логики используются кастомные функции:
+    - создание: `_create`;
+    - обновление: `_update`;
+    - список: `_list`;
+    - удаление/получение: тонкие лямбды над сервисом покупок.
+
+    Args:
+        subparsers: Коллекция сабпарсеров верхнего уровня
+        (после выбора сущности).
+
+    Returns:
+        None
+    """
     spec = CrudCommandSpec(
         command='purchase',
         help='Управление покупками.',

@@ -17,6 +17,21 @@ from app.service.safe_delete import delete_product
 
 
 def register_product_commands(subparsers: argparse._SubParsersAction) -> None:
+    """Зарегистрировать CLI-команды для сущности Product.
+
+    Регистрирует CRUD-команды для продуктов.
+    Для `get` использует `get_product`,
+    чтобы возвращать “богатую” модель (с человекочитаемыми полями, например
+    категорией/единицами). После `add/update` выполняет перечитывание объекта
+    (`refresh_after_write=True`), чтобы вывод не был “голым”.
+
+    Args:
+        subparsers: Коллекция сабпарсеров верхнего уровня
+        (после выбора сущности).
+
+    Returns:
+        None
+    """
     spec = CrudCommandSpec(
         command='product',
         help='Управление продуктами.',

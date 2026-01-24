@@ -69,7 +69,8 @@ ignore = [
     "N805",
     "B904",
     "N802",
-    "B008"
+    "B008",
+    "C901"
 ]
 
 [tool.ruff.lint.per-file-ignores]

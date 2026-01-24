@@ -16,6 +16,21 @@ from app.service.safe_delete import delete_unit
 
 
 def register_unit_commands(subparsers: argparse._SubParsersAction) -> None:
+    """Зарегистрировать CLI-команды для сущности Unit (единицы измерения).
+
+    Регистрирует CRUD-команды для единиц измерения через
+    `register_crud_commands`,
+    настраивает обязательный `measure_type`,
+    табличный вывод и безопасное удаление
+    через `delete_unit`.
+
+    Args:
+        subparsers: Коллекция сабпарсеров верхнего уровня
+        (после выбора сущности).
+
+    Returns:
+        None
+    """
     spec = CrudCommandSpec(
         command='units',
         help='Управление единицами измерения (Е.И.) покупок.',

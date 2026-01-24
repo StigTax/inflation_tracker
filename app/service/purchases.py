@@ -32,6 +32,39 @@ def create_purchase(
     promo_type: Optional[str] = None,
     regular_unit_price: Optional[float] = None,
 ) -> Purchase:
+    """Создать покупку с валидацией и нормализацией промо-полей.
+
+    Правила:
+    - `quantity` и `price` должны быть положительными.
+    - `purchase_date` не может быть в будущем
+      (если не задана — берётся “сегодня”).
+    - Промо-логика:
+      - `is_promo` становится True, если явно передан `is_promo=True` **или**
+        задан `promo_type`/`regular_unit_price`.
+      - если промо выключено, `promo_type` и `regular_unit_price` принудительно
+        обнуляются (None), чтобы данные не противоречили друг другу.
+
+    После создания возвращает покупку с подгруженными связями/нормализованными
+    атрибутами через `purchase_crud.get_with_normal_attr_or_raise(...)`.
+
+    Args:
+        store_id: ID магазина.
+        product_id: ID продукта.
+        quantity: Количество (в единицах продукта).
+        price: Итоговая стоимость покупки.
+        purchase_date: Дата покупки.
+        comment: Комментарий пользователя.
+        is_promo: Флаг “покупка по акции”.
+        promo_type: Тип акции/описание (свободный текст).
+        regular_unit_price: Обычная цена за единицу (для сравнения с акцией).
+
+    Returns:
+        Purchase: Созданная покупка (со связями).
+
+    Raises:
+        ValueError: Если значения невалидны
+        (неположительные числа, дата в будущем).
+    """
     quantity = validate_positive_value(quantity, 'Количество товара')
     price = validate_positive_value(price, 'Стоимость товара')
 
@@ -82,6 +115,40 @@ def update_purchase(
     promo_type: Optional[str] = None,
     regular_unit_price: Optional[float] = None,
 ) -> Purchase:
+    """Обновить покупку с поддержкой частичного обновления и промо-логики.
+
+    Валидирует переданные значения:
+    - `total_price`, `quantity`, `regular_unit_price` должны быть
+      положительными;
+    - `purchase_date` не может быть в будущем.
+
+    Промо-правила:
+    - если `is_promo=False`, то `promo_type` и `regular_unit_price`
+      сбрасываются в None;
+    - если передан `promo_type` или `regular_unit_price`, `is_promo`
+      принудительно True.
+
+    Коммит выполняется вручную (commit=False внутри CRUD), чтобы корректно
+    применить промо-правила до фиксации транзакции.
+
+    Args:
+        purchase_id: ID покупки.
+        store_id: Новый ID магазина.
+        product_id: Новый ID продукта.
+        total_price: Новая итоговая стоимость.
+        quantity: Новое количество.
+        comment: Новый комментарий.
+        purchase_date: Новая дата покупки.
+        is_promo: Явно включить/выключить промо.
+        promo_type: Тип акции/описание.
+        regular_unit_price: Обычная цена за единицу.
+
+    Returns:
+        Purchase: Обновлённая покупка (со связями).
+
+    Raises:
+        ValueError: Если значения невалидны или покупка не найдена.
+    """
 
     if total_price is not None:
         total_price = validate_positive_value(total_price, 'Стоимость товара')
@@ -131,6 +198,17 @@ def update_purchase(
 
 @logged(level=logging.DEBUG)
 def get_purchase_by_id(purchase_id: int) -> Purchase:
+    """Получить покупку по ID с подгруженными связями.
+
+    Args:
+        purchase_id: ID покупки.
+
+    Returns:
+        Purchase: Покупка со связями (магазин, продукт, категория, единица).
+
+    Raises:
+        ValueError: Если покупка не найдена.
+    """
     with get_session() as db:
         return purchase_crud.get_with_normal_attr_or_raise(
             db=db,
@@ -145,6 +223,19 @@ def get_purchase_by_product(
     to_date: Optional[date] = None,
     is_promo: Optional[bool] = None,
 ) -> list[Purchase]:
+    """Получить покупки по продукту за период.
+
+    Даты нормализуются и проверяются через `validate_date_range(...)`.
+
+    Args:
+        product_id: ID продукта.
+        from_date: Начальная дата периода.
+        to_date: Конечная дата периода.
+        is_promo: Фильтр по акциям (True/False) или None — без фильтра.
+
+    Returns:
+        list[Purchase]: Список покупок, отсортированный по дате.
+    """
     from_date, to_date = validate_date_range(from_date, to_date)
     with get_session() as db:
         return purchase_crud.get_purchase_by_product(
@@ -161,6 +252,15 @@ def get_purchase_by_store(
     store_id: int,
     is_promo: Optional[bool] = None
 ) -> list[Purchase]:
+    """Получить покупки по магазину.
+
+    Args:
+        store_id: ID магазина.
+        is_promo: Фильтр по акциям (True/False) или None — без фильтра.
+
+    Returns:
+        list[Purchase]: Список покупок, отсортированный по дате.
+    """
     with get_session() as db:
         return purchase_crud.get_purchase_by_store(
             db=db,
@@ -176,6 +276,17 @@ def list_purchases(
     order_by=None,
     is_promo: Optional[bool] = None
 ) -> list[Purchase]:
+    """Получить общий список покупок с пагинацией.
+
+    Args:
+        offset: Смещение выборки.
+        limit: Максимальное количество записей.
+        order_by: Сортировка (SQLAlchemy выражение/колонка).
+        is_promo: Фильтр по акциям (True/False) или None — без фильтра.
+
+    Returns:
+        list[Purchase]: Список покупок.
+    """
     with get_session() as db:
         return purchase_crud.list(
             db=db,
@@ -188,6 +299,17 @@ def list_purchases(
 
 @logged(level=logging.INFO)
 def delete_purchase(purchase_id: int) -> None:
+    """Удалить покупку по ID.
+
+    Args:
+        purchase_id: ID покупки.
+
+    Returns:
+        None
+
+    Raises:
+        ValueError: Если покупка не найдена.
+    """
     with get_session() as db:
         purchase_crud.delete(db=db, obj_id=purchase_id)
 
@@ -203,6 +325,27 @@ def list_purchases_filtered(
     category_id: Optional[int] = None,
     is_promo: Optional[bool] = None,
 ) -> list[Purchase]:
+    """Универсальная выборка покупок для аналитики и UI-фильтров.
+
+    Поддерживает фильтрацию по:
+    - диапазону дат;
+    - магазину;
+    - продукту или списку продуктов;
+    - категории (через join с Product);
+    - признаку акции.
+
+    Args:
+        from_date: Начальная дата периода.
+        to_date: Конечная дата периода.
+        store_id: ID магазина.
+        product_id: ID продукта.
+        product_ids: Список ID продуктов (корзина/выборка).
+        category_id: ID категории.
+        is_promo: Фильтр по акциям (True/False) или None — без фильтра.
+
+    Returns:
+        list[Purchase]: Список покупок, подходящих под фильтры.
+    """
     from_date, to_date = validate_date_range(from_date, to_date)
     with get_session() as db:
         return purchase_crud.list_filtered(

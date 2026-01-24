@@ -20,6 +20,11 @@ class CRUDBase(Generic[ModelT]):
         self,
         model: Type[ModelT],
     ) -> None:
+        """Инициализировать CRUD-обёртку для конкретной ORM-модели.
+
+        Args:
+            model: Класс ORM-модели SQLAlchemy, с которой работает CRUD.
+        """
         self.model = model
 
     def exists_by_name_ci(
@@ -29,6 +34,19 @@ class CRUDBase(Generic[ModelT]):
         name: str,
         exclude_id: Optional[int] = None
     ) -> bool:
+        """Проверить существование записи по имени без учёта регистра.
+
+        Используется для “человеческой” проверки уникальности, когда БД может
+        не обеспечивать case-insensitive unique на уровне индекса.
+
+        Args:
+            session: Активная SQLAlchemy-сессия.
+            name: Искомое имя (сравнение case-insensitive).
+            exclude_id: ID, который нужно исключить из проверки (удобно для update).
+
+        Returns:
+            bool: True, если найден конфликт по имени; иначе False.
+        """
         col = getattr(self.model, field, None)
         if col is None:
             logger.warning(

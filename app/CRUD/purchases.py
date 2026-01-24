@@ -29,6 +29,24 @@ class PurchaseCRUD(CRUDBase[Purchase]):
         db: Session,
         obj_id: int,
     ) -> Purchase:
+        """Получить покупку по ID с подгруженными связями и нормализованными полями.
+
+        Обычно этот метод нужен, чтобы:
+        - подтянуть `product/category/unit` и `store` одним запросом (selectinload/joinedload),
+          иначе ловишь “Parent instance is not bound to a Session” после закрытия сессии;
+        - вернуть объект с вычисляемыми/нормализованными атрибутами (например, unit_price),
+          если ты их формируешь на уровне модели/сервиса.
+
+        Args:
+            session: Активная SQLAlchemy-сессия.
+            purchase_id: ID покупки.
+
+        Returns:
+            Purchase: Покупка со связями.
+
+        Raises:
+            ValueError: Если покупка не найдена.
+        """
         stmt = self._with_relations(
             select(Purchase).where(Purchase.id == obj_id),
         )
