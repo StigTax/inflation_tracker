@@ -1,0 +1,61 @@
+name: Build Windows EXE
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          python -m pip install "setuptools<81"
+          python -m pip install -e ".[gui,packaging]"
+        shell: pwsh
+
+      - name: Build with PyInstaller (onedir)
+        run: |
+          pyinstaller --noconfirm --clean `
+            --name InflationTracker `
+            --onedir `
+            --windowed `
+            --add-data "alembic.ini;." `
+            --add-data "alembic;alembic" `
+            --collect-data matplotlib `
+            --collect-data pandas `
+            --collect-data numpy `
+            --exclude-module matplotlib.tests `
+            --exclude-module numba `
+            --hidden-import=pandas.core._numba `
+            run_gui.py
+        shell: pwsh
+
+      - name: Create zip
+        run: |
+          Compress-Archive -Path "dist\InflationTracker\*" -DestinationPath "InflationTracker-win64.zip" -Force
+        shell: pwsh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: InflationTracker-win64
+          path: InflationTracker-win64.zip
+
+      - name: Publish to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: InflationTracker-win64.zip

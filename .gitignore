@@ -1,5 +1,8 @@
 __pycache__/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
 *.pyc
 *.pyo
 
@@ -12,3 +15,7 @@ __pycache__/
 venv/
 logs/
 *.log
+
+dist/
+build/
+*.spec

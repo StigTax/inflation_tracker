@@ -7,9 +7,11 @@ import logging
 
 from app.cli import categories, products, purchases, stores, units
 from app.cli.common import configure_db
+from app.core.bootstrap import init_app
 from app.core.config_log import configure_logging
 
 logger = logging.getLogger(__name__)
+init_app(enable_console_logs=True)
 
 
 def build_parser() -> argparse.ArgumentParser:

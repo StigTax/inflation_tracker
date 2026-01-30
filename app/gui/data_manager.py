@@ -8,6 +8,10 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
+from app.core.constants import (
+    DATA_MANAGER_SIZE,
+    DATA_MANAGER_TITLE,
+)
 from app.gui.tabs.categories import CategoriesTab
 from app.gui.tabs.products import ProductsTab
 from app.gui.tabs.purchases import PurchasesTab
@@ -18,8 +22,8 @@ from app.gui.tabs.units import UnitsTab
 class DataManagerDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle('Данные')
-        self.resize(1000, 650)
+        self.setWindowTitle(DATA_MANAGER_TITLE)
+        self.resize(*DATA_MANAGER_SIZE)
 
         tabs = QTabWidget()
         tabs.addTab(StoresTab(), 'Магазины')

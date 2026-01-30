@@ -1,17 +1,17 @@
 [project]
 name = "inflation_tracker"
-version = "0.1.0"
+version = "0.5.0"
 description = "Трекер для отслеживания инляции"
 readme = "README.md"
 classifiers = ["Programming Language :: Python :: 3.9"]
 requires-python = ">=3.9"
 dependencies = [
-    "alembic>=1.17.2",
+    "alembic>=1.16.0,<1.17",
     "sqlalchemy>=2.0.45",
     "prettytable>=3.10.0",
     "python-dotenv>=1.0.0",
-    "pandas=2.3.3",
-    "matplotlib=3.9.4"
+    "pandas==2.3.3",
+    "matplotlib==3.9.4",
 ]
 
 [project.optional-dependencies]
@@ -25,6 +25,18 @@ testing = [
 gui = [
   "PyQt6>=6.6",
 ]
+packaging = [
+    "pyinstaller>=6.0",
+]
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+exclude = ["alembic*", "tests*"]
 
 [tool.ruff]
 line-length = 79

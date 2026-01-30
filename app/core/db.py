@@ -1,18 +1,22 @@
 """Подключение и управление базой данных."""
 
-import os
+from __future__ import annotations
+
 import re
 from contextlib import contextmanager
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import Column, DateTime, Integer, create_engine
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import declarative_base, declared_attr, sessionmaker
 
-DB_URL = os.getenv('DB_URL', 'sqlite:///./test.db')
+from app.core.settings import get_db_url
 
-_engine = None
-_SessionLocal = None
+DB_URL: Optional[str] = None
+_engine: Optional[Engine] = None
+_SessionLocal: Optional[sessionmaker] = None
 
 
 class PreBase:
@@ -34,11 +38,20 @@ class PreBase:
 Base = declarative_base(cls=PreBase)
 
 
-def init_db(db_url: str, echo: bool = False):
+def init_db(db_url: Optional[str] = None, echo: bool = False) -> None:
+    """Инициализировать engine и sessionmaker.
+
+    Args:
+        db_url: URL базы данных. Если None — вычисляется через
+        settings.get_db_url().
+        echo: Включить SQL echo.
+
+    Returns:
+        None
+    """
     global DB_URL, _engine, _SessionLocal
 
-    if db_url:
-        DB_URL = db_url
+    DB_URL = get_db_url(override=db_url)
 
     _engine = create_engine(
         DB_URL,
@@ -56,12 +69,25 @@ def init_db(db_url: str, echo: bool = False):
     )
 
 
-init_db(DB_URL)
+def _ensure_inited() -> None:
+    """Гарантировать, что база инициализирована.
+
+    Returns:
+        None
+    """
+    if _SessionLocal is None:
+        init_db()
 
 
 @contextmanager
 def get_session():
-    session = _SessionLocal()
+    """Получить сессию SQLAlchemy.
+
+    Returns:
+        Session: SQLAlchemy session (context manager).
+    """
+    _ensure_inited()
+    session = _SessionLocal()  # type: ignore[misc]
     try:
         yield session
     finally:
@@ -70,6 +96,11 @@ def get_session():
 
 @contextmanager
 def session_scope():
+    """Скоуп для транзакций с rollback на ошибках.
+
+    Returns:
+        Session: SQLAlchemy session (context manager).
+    """
     with get_session() as session:
         try:
             yield session
