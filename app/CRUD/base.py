@@ -42,7 +42,8 @@ class CRUDBase(Generic[ModelT]):
         Args:
             session: Активная SQLAlchemy-сессия.
             name: Искомое имя (сравнение case-insensitive).
-            exclude_id: ID, который нужно исключить из проверки (удобно для update).
+            exclude_id: ID, который нужно исключить из проверки
+            (удобно для update).
 
         Returns:
             bool: True, если найден конфликт по имени; иначе False.

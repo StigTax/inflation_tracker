@@ -1,178 +1,58 @@
-"""Вкладка GUI для единиц измерения."""
-
 from __future__ import annotations
 
-from PyQt6.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
-    QFormLayout,
-    QHBoxLayout,
-    QLineEdit,
-    QMessageBox,
-    QPushButton,
-    QTableView,
-    QVBoxLayout,
-    QWidget,
-)
+from typing import Any, Dict, cast
+
+from PyQt6.QtWidgets import QDialog
 
 from app.crud import unit_crud
-from app.gui.table_model import DictTableModel
-from app.models.product import Unit
-from app.service.crud_service import (
-    create_item,
-    delete_item,
-    list_items,
-    update_item,
-)
+from app.gui.tabs.common import BaseCrudTab, UnitDialog
+from app.models import Unit
 from app.service.delete_guards import unit_has_no_products
-from app.validate.exceptions import ObjectInUseError
 
 
-class UnitDialog(QDialog):
-    def __init__(self, parent=None, *, measure_type: str = '', unit: str = ''):
-        super().__init__(parent)
-        self.setWindowTitle('Единица измерения')
+class UnitsTab(BaseCrudTab):
+    """CRUD-вкладка для единиц измерения."""
 
-        self.measure_type_edit = QLineEdit(measure_type)
-        self.unit_edit = QLineEdit(unit)
+    entity_caption = 'Единица измерения'
+    entity_accusative = 'единицу измерения'
 
-        form = QFormLayout()
-        form.addRow('Тип (например: вес/объём/штуки):', self.measure_type_edit)
-        form.addRow('Единица (например: кг/л/шт):', self.unit_edit)
+    crud = unit_crud
+    columns = [
+        ('measure_type', 'Тип единицы измерения'),
+        ('unit', 'Единица измерения'),
+    ]
+    column_widths = {
+        'measure_type': 180,
+        'unit': 100,
+    }
 
-        buttons = QDialogButtonBox()
-        buttons.addButton(QDialogButtonBox.StandardButton.Ok)
-        buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
+    delete_guards = [unit_has_no_products]
 
-        layout = QVBoxLayout()
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        self.setLayout(layout)
+    def make_add_dialog(self) -> QDialog:
+        return UnitDialog(self)
 
-    def values(self) -> tuple[str, str]:
-        measure_type = self.measure_type_edit.text().strip()
-        unit = self.unit_edit.text().strip()
-        return measure_type, unit
-
-
-class UnitsTab(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-        self.table = QTableView()
-        self.model = DictTableModel(
-            columns=[
-                ('measure_type', 'Тип единицы измерения'),
-                ('unit', 'Единица измерения'),
-            ],
-            rows=[],
-        )
-        self.table.setModel(self.model)
-        self.table.setSelectionBehavior(
-            QTableView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(
-            QTableView.SelectionMode.SingleSelection
-        )
-
-        btn_add = QPushButton('Добавить')
-        btn_edit = QPushButton('Редактировать')
-        btn_del = QPushButton('Удалить')
-        btn_refresh = QPushButton('Обновить')
-
-        btn_add.clicked.connect(self.on_add)
-        btn_edit.clicked.connect(self.on_edit)
-        btn_del.clicked.connect(self.on_delete)
-        btn_refresh.clicked.connect(self.reload)
-
-        top = QHBoxLayout()
-        top.addWidget(btn_add)
-        top.addWidget(btn_edit)
-        top.addWidget(btn_del)
-        top.addStretch(1)
-        top.addWidget(btn_refresh)
-
-        layout = QVBoxLayout()
-        layout.addLayout(top)
-        layout.addWidget(self.table)
-        self.setLayout(layout)
-
-        self.reload()
-
-    def reload(self) -> None:
-        items = list_items(unit_crud, limit=500)
-        self.model.set_rows([c.to_dict() for c in items])
-
-    def _selected_row(self) -> dict | None:
-        idx = self.table.currentIndex()
-        if not idx.isValid():
-            return None
-        return self.model.row_dict(idx.row())
-
-    def on_add(self) -> None:
-        dlg = UnitDialog(self)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-
-        measure_type, unit = dlg.values()
-        try:
-            create_item(unit_crud, Unit(measure_type=measure_type, unit=unit))
-            self.reload()
-        except Exception as e:
-            QMessageBox.critical(self, 'Ошибка', str(e))
-
-    def on_edit(self) -> None:
-        row = self._selected_row()
-        if not row:
-            QMessageBox.information(
-                self, 'Ок', 'Выбери единицу измерения в таблице.')
-            return
-
-        dlg = UnitDialog(
+    def make_edit_dialog(self, row: Dict[str, Any]) -> QDialog:
+        return UnitDialog(
             self,
-            measure_type=row.get('measure_type', ''),
-            unit=row.get('unit', ''),
+            measure_type=str(row.get('measure_type') or ''),
+            unit=str(row.get('unit') or ''),
         )
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
 
-        measure_type, unit = dlg.values()
-        try:
-            update_item(
-                unit_crud,
-                row['id'],
-                measure_type=measure_type,
-                unit=unit
-            )
-            self.reload()
-        except Exception as e:
-            QMessageBox.critical(self, 'Ошибка', str(e))
+    def build_create_obj(self, dlg: QDialog) -> Any:
+        d = cast(UnitDialog, dlg)
+        measure_type, unit = d.values()
+        return Unit(measure_type=measure_type, unit=unit)
 
-    def on_delete(self) -> None:
-        row = self._selected_row()
-        if not row:
-            QMessageBox.information(
-                self, 'Ок', 'Выбери единицу измерения в таблице.')
-            return
+    def build_update_fields(self, dlg: QDialog) -> Dict[str, Any]:
+        d = cast(UnitDialog, dlg)
+        measure_type, unit = d.values()
+        return {
+            'measure_type': measure_type,
+            'unit': unit,
+        }
 
-        label = (
-            f'{row.get("measure_type", "")} / {row.get("unit", "")}'.strip(
-                ' /'
-            )
-        )
-        ok = QMessageBox.question(
-            self,
-            'Подтверждение',
-            f'Удалить единицу измерения \"{label}\" (id={row["id"]})?',
-        )
-        if ok != QMessageBox.StandardButton.Yes:
-            return
-
-        try:
-            delete_item(unit_crud, row['id'], guards=[unit_has_no_products])
-            self.reload()
-        except ObjectInUseError as e:
-            QMessageBox.warning(self, 'Нельзя удалить', str(e))
-        except Exception as e:
-            QMessageBox.critical(self, 'Ошибка', str(e))
+    def delete_label(self, row: Dict[str, Any]) -> str:
+        measure_type = str(row.get('measure_type') or '')
+        unit = str(row.get('unit') or '')
+        label = f'{measure_type} / {unit}'.strip(' /')
+        return label or super().delete_label(row)

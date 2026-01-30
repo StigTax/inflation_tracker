@@ -18,6 +18,7 @@ GroupBy = Literal['day', 'week', 'month', 'year']
 PriceMode = Literal['paid', 'regular']
 PromoMode = Literal['include', 'exclude', 'only']
 ContributionBy = Literal['product', 'category']
+CountBy = Literal['product', 'category', 'store']
 
 _GROUP_TO_PERIOD = {
     'day': 'D',
@@ -25,7 +26,6 @@ _GROUP_TO_PERIOD = {
     'month': 'M',
     'year': 'Y',
 }
-CountBy = Literal['product', 'category', 'store']
 
 
 def _ensure_group_by(group_by: str) -> GroupBy:
@@ -100,13 +100,11 @@ def _period_start(dts: pd.Series, group_by: GroupBy) -> pd.Series:
         return dts
 
     if group_by == 'week':
-        # week start = Monday
         return dts - pd.to_timedelta(dts.dt.weekday, unit='D')
 
     if group_by == 'month':
         return dts.dt.to_period('M').dt.to_timestamp()
 
-    # year
     return dts.dt.to_period('Y').dt.to_timestamp()
 
 
@@ -202,21 +200,18 @@ def _compute_price_and_spend(
 
     df = df.copy()
 
-    # quantity
     if 'quantity' not in df.columns:
         return df.iloc[0:0]
 
     df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')
     df = df[df['quantity'].notna() & (df['quantity'] > 0)]
 
-    # paid vs regular
     if price_mode == 'paid':
         if 'unit_price' not in df.columns:
             return df.iloc[0:0]
         df['unit_price_used'] = pd.to_numeric(
             df['unit_price'], errors='coerce')
     else:
-        # regular mode: берем regular_unit_price, если есть, иначе unit_price
         if 'regular_unit_price' in df.columns:
             reg = pd.to_numeric(df['regular_unit_price'], errors='coerce')
         else:
@@ -413,7 +408,6 @@ def _laspeyres_index(
     per_agg = per_agg[(per_agg['qty'] > 0) & (per_agg['spend'] > 0)]
     per_agg['price'] = per_agg['spend'] / per_agg['qty']
 
-    # merge with base
     merged = per_agg.merge(
         base_agg[[
             'product_id',
@@ -424,7 +418,6 @@ def _laspeyres_index(
     merged['ratio'] = merged['price'] / merged['base_price']
     merged['w_ratio'] = merged['base_weight'] * merged['ratio']
 
-    # index per period
     idx = (
         merged.groupby('period', as_index=False)
         .agg(

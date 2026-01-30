@@ -14,7 +14,7 @@ from app.core.db import init_db
 
 
 def configure_db(
-    db_url: Optional[str] = None,
+    db_url: str,
     echo_sql: bool = False,
 ) -> None:
     """Настроить подключение к базе данных для CLI.
@@ -39,7 +39,7 @@ def configure_db(
         'DB_URL',
         'sqlite+pysqlite:///./inflation.db',
     )
-    init_db(url, echo=echo_sql)
+    init_db(db_url=url, echo=echo_sql)
 
 
 def parse_date(value: str) -> date:

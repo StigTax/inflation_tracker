@@ -55,7 +55,6 @@ def _repr_namespace(
     seq_limit: int,
     map_limit: int,
 ) -> str | object:
-    # argparse.Namespace
     if value.__class__.__name__ == 'Namespace' and hasattr(value, '__dict__'):
         return _safe_repr(
             vars(value),
@@ -299,6 +298,6 @@ def logged(
 
             return result
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     return decorator

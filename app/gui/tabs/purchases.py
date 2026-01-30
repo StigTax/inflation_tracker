@@ -1,9 +1,7 @@
-"""Вкладка GUI для покупок."""
-
 from __future__ import annotations
 
 from datetime import date
-from typing import Optional, cast
+from typing import Any, Dict, List, Optional, cast
 
 from PyQt6.QtCore import QDate
 from PyQt6.QtWidgets import (
@@ -15,6 +13,7 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QMessageBox,
     QPushButton,
@@ -25,7 +24,9 @@ from PyQt6.QtWidgets import (
 )
 
 from app.crud import product_crud, store_crud
+from app.gui.qt_helpers import setup_searchable_combo
 from app.gui.table_model import DictTableModel
+from app.gui.tabs.common import list_items_safe, set_combo_by_data
 from app.models import Purchase
 from app.service.purchases import (
     create_purchase,
@@ -37,27 +38,17 @@ from app.service.purchases import (
 )
 
 
-def _set_combo_by_data(combo: QComboBox, data) -> None:
-    for i in range(combo.count()):
-        if combo.itemData(i) == data:
-            combo.setCurrentIndex(i)
-            return
-
-
-def list_items_safe(crud, limit: int = 2000):
-    from app.service.crud_service import list_items
-    return list_items(crud, limit=limit)
-
-
 class PurchaseDialog(QDialog):
+    """Диалог создания/редактирования покупки."""
+
     def __init__(
         self,
         parent=None,
         *,
         purchase_date: Optional[date] = None,
-        product_id: Optional[int]  = None,
-        store_id: Optional[int]  = None,
-        quantity: Optional[float]  = None,
+        product_id: Optional[int] = None,
+        store_id: Optional[int] = None,
+        quantity: Optional[float] = None,
         total_price: Optional[float] = None,
         comment: Optional[str] = None,
         is_promo: bool = False,
@@ -67,16 +58,26 @@ class PurchaseDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle('Покупка')
 
-        products = list_items_safe(product_crud)
-        stores = list_items_safe(store_crud)
+        products = list_items_safe(product_crud, limit=5000)
+        stores = list_items_safe(store_crud, limit=5000)
 
         self.product_combo = QComboBox()
         self.store_combo = QComboBox()
 
+        setup_searchable_combo(
+            self.product_combo,
+            placeholder='Начни печатать продукт…'
+        )
+        setup_searchable_combo(
+            self.store_combo,
+            placeholder='Начни печатать магазин…'
+        )
+
         self.product_combo.addItem('— выбери продукт —', None)
         for p in products:
             label = (
-                f'{p.name} ({p.unit.measure_type} {p.unit.unit}) (id={p.id})'
+                f'{p.name} ({p.unit.measure_type} '
+                f'{p.unit.unit}) (id={p.id})'
             )
             self.product_combo.addItem(label, p.id)
 
@@ -116,7 +117,7 @@ class PurchaseDialog(QDialog):
             'loyalty',
             'clearance',
             'coupon',
-            'cashback'
+            'cashback',
         ]:
             self.promo_type_combo.addItem(t, t)
 
@@ -124,15 +125,16 @@ class PurchaseDialog(QDialog):
         self.regular_price_spin.setDecimals(2)
         self.regular_price_spin.setRange(0.01, 1_000_000_000)
         self.regular_price_spin.setValue(
-            float(regular_unit_price) if regular_unit_price else 0.01)
+            float(regular_unit_price) if regular_unit_price else 0.01
+        )
 
         self.comment_edit = QTextEdit()
         self.comment_edit.setFixedHeight(80)
         self.comment_edit.setPlainText(comment or '')
 
-        _set_combo_by_data(self.product_combo, product_id)
-        _set_combo_by_data(self.store_combo, store_id)
-        _set_combo_by_data(self.promo_type_combo, promo_type)
+        set_combo_by_data(self.product_combo, product_id)
+        set_combo_by_data(self.store_combo, store_id)
+        set_combo_by_data(self.promo_type_combo, promo_type)
 
         self._toggle_promo_fields()
 
@@ -177,21 +179,19 @@ class PurchaseDialog(QDialog):
             QMessageBox.warning(self, 'Проверка', 'Выбери продукт.')
             return
         if self.store_combo.currentData() is None:
-            QMessageBox.warning(
-                self,
-                'Проверка',
-                'Выбери магазин.'
-            )
+            QMessageBox.warning(self, 'Проверка', 'Выбери магазин.')
             return
         self.accept()
 
-    def values(self) -> dict:
+    def values(self) -> Dict[str, Any]:
+        """Возвращает значения формы."""
         comment = self.comment_edit.toPlainText().strip() or None
         is_promo = self.is_promo_check.isChecked()
         promo_type = self.promo_type_combo.currentData() if is_promo else None
         regular_unit_price = (
             self.regular_price_spin.value() if is_promo else None
         )
+
         return {
             'purchase_date': self.date_edit.date().toPyDate(),
             'product_id': int(self.product_combo.currentData()),
@@ -201,17 +201,18 @@ class PurchaseDialog(QDialog):
             'comment': comment,
             'is_promo': is_promo,
             'promo_type': promo_type,
-            'regular_unit_price': float(
-                regular_unit_price
-            ) if regular_unit_price is not None else None,
+            'regular_unit_price': float(regular_unit_price)
+            if regular_unit_price is not None
+            else None,
         }
 
 
 class PurchasesTab(QWidget):
+    """CRUD-вкладка для покупок с фильтрами."""
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # --- таблица ---
         self.table = QTableView()
         self.model = DictTableModel(
             columns=[
@@ -233,8 +234,8 @@ class PurchasesTab(QWidget):
             QTableView.SelectionBehavior.SelectRows
         )
         self.table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
+        self._apply_table_layout()
 
-        # --- кнопки CRUD ---
         btn_add = QPushButton('Добавить')
         btn_edit = QPushButton('Редактировать')
         btn_del = QPushButton('Удалить')
@@ -249,9 +250,17 @@ class PurchasesTab(QWidget):
         crud_row.addWidget(btn_del)
         crud_row.addStretch(1)
 
-        # --- фильтры ---
         self.filter_product_combo = QComboBox()
         self.filter_store_combo = QComboBox()
+
+        setup_searchable_combo(
+            self.filter_product_combo,
+            placeholder='Фильтр: продукт…'
+        )
+        setup_searchable_combo(
+            self.filter_store_combo,
+            placeholder='Фильтр: магазин…'
+        )
 
         self.filter_date_check = QCheckBox('Фильтр по датам')
         self.filter_from = QDateEdit()
@@ -274,7 +283,6 @@ class PurchasesTab(QWidget):
 
         btn_apply = QPushButton('Применить')
         btn_reset = QPushButton('Сброс')
-
         btn_apply.clicked.connect(self.reload)
         btn_reset.clicked.connect(self.on_reset_filters)
 
@@ -295,13 +303,11 @@ class PurchasesTab(QWidget):
         filter_row.addWidget(btn_apply)
         filter_row.addWidget(btn_reset)
 
-        # --- низ: счётчик ---
         self.count_label = QLabel('Показано покупок: 0')
         bottom = QHBoxLayout()
         bottom.addWidget(self.count_label)
         bottom.addStretch(1)
 
-        # --- layout ---
         layout = QVBoxLayout()
         layout.addLayout(crud_row)
         layout.addLayout(filter_row)
@@ -312,31 +318,53 @@ class PurchasesTab(QWidget):
         self._load_filter_data()
         self.reload()
 
+    def _apply_table_layout(self) -> None:
+        """Настраивает ширины колонок таблицы покупок.
+
+        Идея:
+        - большинство колонок получают стартовую фиксированную ширину
+        - 'Комментарий' растягивается и забирает остаток
+        - режим Interactive оставляет пользователю возможность руками
+          менять ширины
+        """
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+
+        self.table.setColumnWidth(0, 95)
+        self.table.setColumnWidth(1, 280)
+        self.table.setColumnWidth(2, 180)
+        self.table.setColumnWidth(3, 180)
+        self.table.setColumnWidth(4, 90)
+        self.table.setColumnWidth(5, 90)
+        self.table.setColumnWidth(6, 90)
+        self.table.setColumnWidth(7, 60)
+        self.table.setColumnWidth(8, 70)
+
+        header.setSectionResizeMode(9, QHeaderView.ResizeMode.Stretch)
+
     def _toggle_date_filters(self) -> None:
         enabled = self.filter_date_check.isChecked()
         self.filter_from.setEnabled(enabled)
         self.filter_to.setEnabled(enabled)
 
     def _load_filter_data(self) -> None:
-        # Продукты
         self.filter_product_combo.clear()
         self.filter_product_combo.addItem('— все продукты —', None)
         for p in list_items_safe(product_crud, limit=5000):
             self.filter_product_combo.addItem(p.name, p.id)
 
-        # Магазины
         self.filter_store_combo.clear()
         self.filter_store_combo.addItem('— все магазины —', None)
         for s in list_items_safe(store_crud, limit=5000):
             self.filter_store_combo.addItem(s.name, s.id)
 
-    def _selected_row(self) -> dict | None:
+    def _selected_row(self) -> Optional[Dict[str, Any]]:
         idx = self.table.currentIndex()
         if not idx.isValid():
             return None
-        return self.model.row_dict(idx.row())
+        return cast(Dict[str, Any], self.model.row_dict(idx.row()))
 
-    def _current_filters(self) -> dict:
+    def _current_filters(self) -> Dict[str, Any]:
         product_id = self.filter_product_combo.currentData()
         store_id = self.filter_store_combo.currentData()
 
@@ -346,7 +374,7 @@ class PurchasesTab(QWidget):
             from_date = self.filter_from.date().toPyDate()
             to_date = self.filter_to.date().toPyDate()
 
-        sort_dir = self.sort_combo.currentData()  # 'asc' или 'desc'
+        sort_dir = self.sort_combo.currentData()
         return {
             'product_id': product_id,
             'store_id': store_id,
@@ -356,8 +384,8 @@ class PurchasesTab(QWidget):
         }
 
     def on_reset_filters(self) -> None:
-        _set_combo_by_data(self.filter_product_combo, None)
-        _set_combo_by_data(self.filter_store_combo, None)
+        set_combo_by_data(self.filter_product_combo, None)
+        set_combo_by_data(self.filter_store_combo, None)
 
         self.filter_date_check.setChecked(False)
 
@@ -365,14 +393,13 @@ class PurchasesTab(QWidget):
         self.filter_from.setDate(QDate(today.year, today.month, 1))
         self.filter_to.setDate(QDate(today.year, today.month, today.day))
 
-        self.sort_combo.setCurrentIndex(0)  # новые
         self.reload()
 
     def reload(self) -> None:
         f = self._current_filters()
         sort_desc = f['sort_dir'] == 'desc'
 
-        items: list[Purchase]
+        items: List[Purchase]
 
         if f['product_id'] is not None:
             items = get_purchase_by_product(
@@ -392,9 +419,12 @@ class PurchasesTab(QWidget):
                 items = [p for p in items if p.purchase_date <= f['to_date']]
 
         else:
-            order_by = Purchase.purchase_date.desc(
-            ) if sort_desc else Purchase.purchase_date.asc()
-            items = list_purchases(limit=2000, order_by=order_by)
+            order_by = (
+                Purchase.purchase_date.desc()
+                if sort_desc
+                else Purchase.purchase_date.asc()
+            )
+            items = list_purchases(limit=5000, order_by=order_by)
 
             if f['from_date'] is not None:
                 items = [p for p in items if p.purchase_date >= f['from_date']]
@@ -404,7 +434,8 @@ class PurchasesTab(QWidget):
         items = sorted(
             items,
             key=lambda p: cast(date, p.purchase_date),
-            reverse=sort_desc)
+            reverse=sort_desc,
+        )
 
         rows = [p.to_dict() for p in items]
         self.model.set_rows(rows)
@@ -413,11 +444,17 @@ class PurchasesTab(QWidget):
     def on_add(self) -> None:
         if not list_items_safe(product_crud, limit=1):
             QMessageBox.warning(
-                self, 'Нельзя', 'Сначала создай хотя бы один продукт.')
+                self,
+                'Нельзя',
+                'Сначала создай хотя бы один продукт.'
+            )
             return
         if not list_items_safe(store_crud, limit=1):
             QMessageBox.warning(
-                self, 'Нельзя', 'Сначала создай хотя бы один магазин.')
+                self,
+                'Нельзя',
+                'Сначала создай хотя бы один магазин.'
+            )
             return
 
         dlg = PurchaseDialog(self)
@@ -449,15 +486,18 @@ class PurchasesTab(QWidget):
 
         dlg = PurchaseDialog(
             self,
-            purchase_date=row.get('purchase_date'),
-            product_id=row.get('product_id'),
-            store_id=row.get('store_id'),
-            quantity=row.get('quantity'),
-            total_price=row.get('total_price'),
-            comment=row.get('comment'),
+            purchase_date=cast(Optional[date], row.get('purchase_date')),
+            product_id=cast(Optional[int], row.get('product_id')),
+            store_id=cast(Optional[int], row.get('store_id')),
+            quantity=cast(Optional[float], row.get('quantity')),
+            total_price=cast(Optional[float], row.get('total_price')),
+            comment=cast(Optional[str], row.get('comment')),
             is_promo=bool(row.get('is_promo')),
-            promo_type=row.get('promo_type'),
-            regular_unit_price=row.get('regular_unit_price'),
+            promo_type=cast(Optional[str], row.get('promo_type')),
+            regular_unit_price=cast(
+                Optional[float],
+                row.get('regular_unit_price')
+            ),
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -465,7 +505,7 @@ class PurchasesTab(QWidget):
         v = dlg.values()
         try:
             update_purchase(
-                purchase_id=row['id'],
+                purchase_id=int(row['id']),
                 store_id=v['store_id'],
                 product_id=v['product_id'],
                 total_price=v['total_price'],
@@ -487,8 +527,8 @@ class PurchasesTab(QWidget):
             return
 
         label = (
-            f'{row.get("purchase_date")} — {row.get("product")} —'
-            f'{row.get("store")}'
+            f'{row.get("purchase_date")} —'
+            f'{row.get("product")} — {row.get("store")}'
         )
         ok = QMessageBox.question(
             self,
@@ -499,7 +539,7 @@ class PurchasesTab(QWidget):
             return
 
         try:
-            delete_purchase(row['id'])
+            delete_purchase(int(row['id']))
             self.reload()
         except Exception as e:
             QMessageBox.critical(self, 'Ошибка', str(e))
