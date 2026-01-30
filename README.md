@@ -94,6 +94,9 @@ python -m app.cli.main purchase list \
 ## Скриншоты графического интерфейса
 _Заготовка для будущих скриншотов GUI:_
 
-![Главный экран](docs/screenshots/main.png)
-![Экран аналитики](docs/screenshots/analytics.png)
-![Список покупок](docs/screenshots/purchases.png)
+![Главный экран](docs\screenshots/main.png)
+![Список магазинов](docs\screenshots/store_crud.png)
+![Список категорий](docs\screenshots/category_crud.png)
+![Список единиц измерений](docs\screenshots/unit_crud.png)
+![Список продуктов](docs\screenshots/product_crud.png)
+![Список покупок](docs\screenshots/purchase_crud.png)
