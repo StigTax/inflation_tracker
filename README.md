@@ -1,52 +1,102 @@
-# Трекер для отслеживания инфляции
+# Трекер инфляции
 
-Небольшое приложение для учета покупок и анализа динамики цен.
-В проекте есть CLI для CRUD-операций и GUI на PyQt6.
+Небольшое приложение для учёта покупок и анализа динамики цен.
+В проекте есть **CLI** для CRUD-операций и **GUI** на **PyQt6**.
 
-## Локальное развертывание
+---
 
-### Требования
-- Python 3.9+
+## Возможности
 
-### Установка зависимостей
-Рекомендуемый способ для разработки:
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Linux/macOS
-# Windows (PowerShell):
-.venv\Scripts\Activate.ps1
+- Справочники: **магазины**, **категории**, **единицы измерения**, **продукты**
+- Учёт покупок: дата, количество, сумма, комментарии, промо (если включено)
+- Аналитика и графики: динамика цен/инфляции по выбранным параметрам
+- CLI-режим подходит для автоматизации и скриптов
 
-pip install -r requirements.txt
-```
+---
 
-### База данных и конфигурация
-По умолчанию приложение использует SQLite и само применяет миграции при
-первом запуске.
+## Быстрый старт для пользователей (Windows)
+
+1. Открой вкладку **Releases** в репозитории и скачай архив сборки (zip).
+2. Распакуй архив в любую папку.
+3. Запусти `InflationTracker.exe`.
+
+При первом запуске приложение создаст базу SQLite и автоматически применит миграции.
+
+---
+
+## Где лежат база и логи
+
+По умолчанию используется SQLite, файлы создаются в каталоге состояния пользователя (чтобы работало и из исходников, и из exe).
+
+**Windows**
+- БД: `%APPDATA%\InflationTracker\inflation.db`
+- Логи: `%APPDATA%\InflationTracker\logs\logs_to_YYYY-MM-DD.log`
+
+**Linux**
+- БД: `~/.local/state/InflationTracker/inflation.db`
+- Логи: `~/.local/state/InflationTracker/logs/`
+
+**macOS**
+- БД: `~/Library/Application Support/InflationTracker/inflation.db`
+- Логи: `~/Library/Application Support/InflationTracker/logs/`
+
+---
+
+## Конфигурация БД
+
 Источник БД выбирается в следующем порядке:
-1) `--db-url` (CLI) или `DB_URL` (окружение),
-2) `./inflation.db` в корне проекта (если файл существует),
-3) пользовательский каталог состояния (APPDATA/`~/.local/state` и т.п.).
 
-Можно положить `DB_URL` в `.env` в корне проекта — он будет подхвачен
-автоматически.
+1) `--db-url` (CLI) или `DB_URL` (окружение)  
+2) `./inflation.db` в корне проекта (если файл существует)  
+3) каталог состояния пользователя (см. выше)
 
-Пример для Linux/macOS:
+Можно положить `DB_URL` в `.env` в корне проекта — он будет подхвачен автоматически.
+
+Пример:
 ```bash
 export DB_URL="sqlite+pysqlite:///$(pwd)/inflation.db"
 ```
 
+---
+
+## Запуск из исходников (для разработки)
+
+### Требования
+
+Python 3.9+
+
+### Установка
+
+Рекомендуемый способ:
+
+```bash
+python -m venv .venv
+
+# Windows (PowerShell):
+.venv\Scripts\Activate.ps1
+
+# Linux/macOS:
+source .venv/bin/activate
+
+pip install -e ".[gui]"
+```
+
 ### Запуск
+
 CLI:
+
 ```bash
 python -m app.cli.main --help
 ```
 
-GUI (нужны зависимости из requirements.txt, включая PyQt6):
+GUI:
+
 ```bash
 python -m app.gui.main
 ```
 
-## Примеры CLI
+### Примеры CLI
+
 Базовый сценарий: создать справочники, затем покупки.
 
 ```bash
@@ -87,16 +137,48 @@ python -m app.cli.main purchase list \
   --table
 ```
 
-Полезные опции:
-- `--db-url` и `--echo-sql` доступны для всех CLI-команд.
-- `list` поддерживает `--full` (key: value) и `--table` (таблица).
+### Полезные опции
 
-## Скриншоты графического интерфейса
-_Заготовка для будущих скриншотов GUI:_
+`--db-url` и `--echo-sql` доступны для всех CLI-команд.
 
-![Главный экран](docs\screenshots/main.png)
-![Список магазинов](docs\screenshots/store_crud.png)
-![Список категорий](docs\screenshots/category_crud.png)
-![Список единиц измерений](docs\screenshots/unit_crud.png)
-![Список продуктов](docs\screenshots/product_crud.png)
-![Список покупок](docs\screenshots/purchase_crud.png)
+`list` поддерживает `--full` (key: value) и `--table` (таблица).
+
+---
+
+## Скриншоты GUI
+
+Файлы лежат в docs/screenshots/.
+
+---
+
+## Сборка exe (для сопровождающих)
+
+Сборка делается через PyInstaller (Windows). В проекте используется подход, при котором миграции Alembic упаковываются в сборку и применяются автоматически при первом запуске.
+
+Типовой сценарий (onedir):
+
+```bash
+pyinstaller --noconfirm --clean \
+  --name InflationTracker \
+  --onedir \
+  --windowed \
+  --add-data "alembic.ini;." \
+  --add-data "alembic;alembic" \
+  --collect-data matplotlib \
+  --collect-data pandas \
+  --collect-data numpy \
+  --exclude-module matplotlib.tests \
+  --exclude-module numba \
+  --hidden-import=pandas.core._numba \
+  run_gui.py
+```
+
+---
+
+## Отчёты об ошибках
+
+Если что-то пошло не так:
+
+- приложи лог-файл из каталога логов (см. раздел выше),
+- укажи версию релиза и ОС,
+- опиши шаги, после которых появилась проблема.
