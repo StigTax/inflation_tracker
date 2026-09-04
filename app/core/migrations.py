@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import logging
-import logging.config
 import os
 import sys
 from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, inspect
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +34,12 @@ def _alembic_ini_path() -> Path:
 
 
 def ensure_db_schema(db_url: str) -> None:
-    """Гарантировать наличие схемы БД.
+    """Гарантировать, что схема БД соответствует последней миграции.
 
-    Если база пустая (нет ключевой таблицы purchase), применяются миграции.
+    Всегда прогоняет `alembic upgrade head`: Alembic сам сверяет текущую
+    ревизию (таблица alembic_version) с head и не делает ничего, если
+    накатывать нечего. Проверка "есть ли таблица purchase" не защищала
+    от отставших ревизий на уже существующей базе — убрана.
 
     Args:
         db_url: URL подключения SQLAlchemy.
@@ -46,22 +47,7 @@ def ensure_db_schema(db_url: str) -> None:
     Raises:
         RuntimeError: Если применить миграции не удалось.
     """
-    engine = create_engine(
-        db_url,
-        connect_args=(
-            {'check_same_thread': False} if db_url.startswith('sqlite') else {}
-        ),
-        future=True,
-    )
-
-    inspector = inspect(engine)
-    if inspector.has_table('purchase'):
-        return
-
-    logger.warning(
-        'База данных не инициализирована (нет таблицы purchase). '
-        'Применяю миграции Alembic...'
-    )
+    logging.getLogger('alembic.runtime.migration').setLevel(logging.WARNING)
     upgrade_db(db_url)
 
 
@@ -94,6 +80,6 @@ def upgrade_db(db_url: str, *, revision: str = 'head') -> None:
 
     try:
         command.upgrade(cfg, revision)
-        logger.info('Миграции Alembic применены: %s', revision)
+        logger.info('Схема БД синхронизирована с Alembic (%s)', revision)
     except Exception as e:
         raise RuntimeError('Не удалось применить миграции Alembic.') from e
