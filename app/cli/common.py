@@ -3,19 +3,17 @@
 from __future__ import annotations
 
 import argparse
-import os
 from collections.abc import Sequence
 from datetime import date
 from typing import Any, Optional
 
 from prettytable import PrettyTable
 
+from app.core import db as db_module
 from app.core.constants import (
     CLI_DEFAULT_LIMIT,
     CLI_DEFAULT_OFFSET,
     CLI_VERBOSE_SEPARATOR_LEN,
-    DB_URL_ENV_VAR,
-    DEFAULT_DB_URL,
 )
 from app.core.db import init_db
 from app.core.migrations import ensure_db_schema
@@ -35,11 +33,10 @@ def configure_db(
     Returns:
         None
     """
-    url = db_url or os.getenv(DB_URL_ENV_VAR, DEFAULT_DB_URL)
-    init_db(db_url=url, echo=echo_sql)
+    init_db(db_url=db_url, echo=echo_sql)
+    url = db_module.DB_URL
 
-    is_memory = ':memory:' in url
-    if not is_memory:
+    if url and ':memory:' not in url:
         ensure_db_schema(url)
 
 

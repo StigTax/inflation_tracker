@@ -6,12 +6,11 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Optional
 
+from app.core import db as db_module
 from app.core.config_log import configure_logging
-from app.core.constants import DB_URL_ENV_VAR, DEFAULT_DB_URL
 from app.core.db import init_db
 from app.core.migrations import ensure_db_schema
 
@@ -34,10 +33,10 @@ def init_app(
     """
     configure_logging(enable_console=enable_console_logs, log_dir=log_dir)
 
-    url = db_url or os.getenv(DB_URL_ENV_VAR, DEFAULT_DB_URL)
-    init_db(url)
+    init_db(db_url)
+    url = db_module.DB_URL
 
-    if ':memory:' not in url:
+    if url and ':memory:' not in url:
         ensure_db_schema(url)
 
     return url

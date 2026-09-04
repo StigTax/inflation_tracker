@@ -1,6 +1,3 @@
-from datetime import date
-from pathlib import Path
-
 from app.models.purchase import Purchase
 
 APP_NAME = 'InflationTracker'
@@ -14,10 +11,6 @@ LOG_ROTATE_BACKUP_COUNT = 5
 CLI_DEFAULT_OFFSET = 0
 CLI_DEFAULT_LIMIT = 100
 CLI_VERBOSE_SEPARATOR_LEN = 40
-
-BASE_DIR = Path(__file__).parent.parent
-LOG_DIR = BASE_DIR / 'logs'
-LOG_FILE = LOG_DIR / f'logs_to_{date.today()}.log'
 
 LOG_FORMAT = '%(asctime)s - [%(levelname)s] - %(funcName)s: %(message)s'
 DT_FORMAT = '%d.%m.%Y %H:%M:%S'
