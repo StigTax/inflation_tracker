@@ -15,4 +15,5 @@ pyinstaller --noconfirm \
   --exclude-module matplotlib.tests \
   --exclude-module numba \
   --hidden-import=pandas.core._numba \
+  --hidden-import=logging.config \
   run_gui.py

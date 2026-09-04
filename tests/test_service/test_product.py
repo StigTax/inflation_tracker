@@ -1,5 +1,6 @@
 """Тесты сервиса продуктов."""
 
+from app.crud.base import CLEAR
 from app.crud.products import crud
 from app.service import crud_service
 
@@ -59,3 +60,12 @@ def test_get_list_product(few_products):
     assert 'Помидоры' in product_names
     assert 'Морковь' in product_names
     assert 'Капуста' in product_names
+
+
+def test_update_product_clear_category_sets_null(product_vegetable):
+    updated_product = crud_service.update_item(
+        crud,
+        product_vegetable.id,
+        category_id=CLEAR,
+    )
+    assert updated_product.category_id is None

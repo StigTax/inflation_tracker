@@ -58,6 +58,7 @@ def override_get_session(monkeypatch, engine):
     for mod_path in [
         'app.service.purchases',
         'app.service.crud_service',
+        'app.service.analytics',
     ]:
         try:
             mod = __import__(mod_path, fromlist=['get_session'])

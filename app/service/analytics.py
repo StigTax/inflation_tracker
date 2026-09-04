@@ -160,7 +160,7 @@ def _apply_promo_filter(
     if 'is_promo' not in df.columns:
         return df.iloc[0:0] if promo_mode == 'only' else df
 
-    promo = df['is_promo'].fillna(False).astype(bool)
+    promo = df['is_promo'].fillna(False).infer_objects(copy=False).astype(bool)
 
     if promo_mode == 'include':
         return df

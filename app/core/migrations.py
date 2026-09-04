@@ -61,6 +61,7 @@ def upgrade_db(db_url: str, *, revision: str = 'head') -> None:
     Raises:
         RuntimeError: Если alembic.ini не найден или миграции упали.
     """
+    import logging.config  # noqa: F401
     try:
         import app.core.base  # noqa: F401
     except Exception:
