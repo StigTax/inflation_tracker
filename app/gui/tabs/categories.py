@@ -33,6 +33,7 @@ class CategoriesTab(BaseCrudTab):
         ('По названию: А→Я', ('name', 'asc')),
         ('По названию: Я→А', ('name', 'desc')),
     ]
+    cache_keys = ('categories', 'products')
 
     delete_guards = [category_has_no_products]
 

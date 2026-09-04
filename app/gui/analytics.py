@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 from app.crud import category_crud, product_crud, store_crud
 from app.gui.data_manager import DataManagerDialog
 from app.gui.qt_helpers import setup_searchable_combo
+from app.gui.ref_cache import get_cached
 from app.service import analytics as svc
 from app.service.crud_service import list_items
 from app.service.purchases import (
@@ -159,9 +160,7 @@ class AnalyticsWidget(QWidget):
         root.addWidget(splitter, stretch=1)
         self.setLayout(root)
 
-        self.reload_products()
-        self.reload_categories()
-        self.reload_stores()
+        self._reload_combos()
         self._init_date_bounds()
         self._on_kind_changed()
 
@@ -218,47 +217,58 @@ class AnalyticsWidget(QWidget):
 
     # ------------------- reload combos with counts -------------------
 
-    def reload_products(self) -> None:
+    def _reload_combos(self) -> None:
+        """Обновляет продукты/категории/магазины одним проходом.
+
+        get_purchase_usage_counts() — это 3 GROUP BY по всей таблице
+        покупок; незачем гонять его трижды ради одних и тех же чисел.
+        """
+        counts = get_purchase_usage_counts()
+        self.reload_products(counts)
+        self.reload_categories(counts)
+        self.reload_stores(counts)
+
+    def reload_products(self, counts: Optional[dict] = None) -> None:
         """Перезагружает список продуктов и добавляет счётчик покупок."""
         self.product_combo.clear()
         self.product_combo.addItem('— выбери продукт —', None)
 
-        counts = get_purchase_usage_counts()
-        prod_cnt = counts.get('products', {})
+        prod_cnt = (counts or get_purchase_usage_counts()).get('products', {})
 
-        products = list_items(product_crud, limit=5000)
+        products = get_cached(
+            'products', lambda: list_items(product_crud, limit=5000)
+        )
         for p in products:
             unit = ''
             if getattr(p, 'unit', None):
                 unit = f'{p.unit.measure_type} {p.unit.unit}'
             cnt = int(prod_cnt.get(p.id, 0))
-            self.product_combo.addItem(
-                f'{p.name} ({unit}) — {cnt}',
-                p.id
-            )
+            self.product_combo.addItem(f'{p.name} ({unit}) — {cnt}', p.id)
 
-    def reload_categories(self) -> None:
+    def reload_categories(self, counts: Optional[dict] = None) -> None:
         """Перезагружает список категорий и добавляет счётчик покупок."""
         self.category_combo.clear()
         self.category_combo.addItem('— выбери категорию —', None)
 
-        counts = get_purchase_usage_counts()
-        cat_cnt = counts.get('categories', {})
+        cat_cnt = (counts or get_purchase_usage_counts()).get('categories', {})
 
-        cats = list_items(category_crud, limit=5000)
+        cats = get_cached(
+            'categories', lambda: list_items(category_crud, limit=5000)
+        )
         for c in cats:
             cnt = int(cat_cnt.get(c.id, 0))
             self.category_combo.addItem(f'{c.name} — {cnt}', c.id)
 
-    def reload_stores(self) -> None:
+    def reload_stores(self, counts: Optional[dict] = None) -> None:
         """Перезагружает список магазинов и добавляет счётчик покупок."""
         self.store_combo.clear()
         self.store_combo.addItem('— выбери магазин —', None)
 
-        counts = get_purchase_usage_counts()
-        store_cnt = counts.get('stores', {})
+        store_cnt = (counts or get_purchase_usage_counts()).get('stores', {})
 
-        stores = list_items(store_crud, limit=5000)
+        stores = get_cached(
+            'stores', lambda: list_items(store_crud, limit=5000)
+        )
         for s in stores:
             cnt = int(store_cnt.get(s.id, 0))
             self.store_combo.addItem(f'{s.name} — {cnt}', s.id)
@@ -267,9 +277,7 @@ class AnalyticsWidget(QWidget):
         """Открывает диалог управления данными и обновляет списки."""
         dlg = DataManagerDialog(self)
         dlg.exec()
-        self.reload_products()
-        self.reload_categories()
-        self.reload_stores()
+        self._reload_combos()
         self._init_date_bounds()
 
     # ------------------- kind switching -------------------

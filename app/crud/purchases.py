@@ -164,7 +164,9 @@ class PurchaseCRUD(CRUDBase[Purchase]):
         if date_to is not None:
             stmt = stmt.where(Purchase.purchase_date <= date_to)
 
-        stmt = stmt.order_by(order_by or Purchase.purchase_date)
+        stmt = stmt.order_by(
+            order_by if order_by is not None else Purchase.purchase_date
+        )
         stmt = self._with_relations(stmt)
         return list(db.scalars(stmt).all())
 

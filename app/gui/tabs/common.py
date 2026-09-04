@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from app.gui.ref_cache import invalidate
 from app.gui.table_model import DictTableModel
 from app.service.crud_service import (
     create_item,
@@ -235,6 +236,8 @@ class BaseCrudTab(QWidget):
     list_limit: int = 500
     delete_guards: Optional[List[Any]] = None
 
+    cache_keys: Tuple[str, ...] = ()
+
     # Включает ленту (как у покупок)
     enable_filter_bar: bool = False
 
@@ -358,6 +361,10 @@ class BaseCrudTab(QWidget):
             f'Выбери {self.entity_accusative} в таблице.'
         )
 
+    def _invalidate_cache(self) -> None:
+        if self.cache_keys:
+            invalidate(*self.cache_keys)
+
     def _apply_column_widths(self) -> None:
         """Применяет стартовые ширины колонок и режимы ресайза."""
         header = self.table.horizontalHeader()
@@ -469,6 +476,7 @@ class BaseCrudTab(QWidget):
         try:
             obj = self.build_create_obj(dlg)
             create_item(self.crud, obj)
+            self._invalidate_cache()
             self.reload()
         except Exception as e:
             QMessageBox.critical(self, 'Ошибка', str(e))
@@ -486,6 +494,7 @@ class BaseCrudTab(QWidget):
         try:
             fields = self.build_update_fields(dlg)
             update_item(self.crud, int(row['id']), **fields)
+            self._invalidate_cache()
             self.reload()
         except Exception as e:
             QMessageBox.critical(self, 'Ошибка', str(e))
@@ -510,6 +519,7 @@ class BaseCrudTab(QWidget):
                 self.crud,
                 int(row['id']
             ), guards=list(self.delete_guards or []))
+            self._invalidate_cache()
             self.reload()
         except ObjectInUseError as e:
             QMessageBox.warning(self, 'Нельзя удалить', str(e))

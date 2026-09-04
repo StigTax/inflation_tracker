@@ -67,6 +67,7 @@ def override_get_session(monkeypatch, engine):
             pass
 
 
+
 # ---------- fixtures: categories ----------
 @pytest.fixture
 def category_food():
@@ -92,7 +93,19 @@ def few_categories():
         ),
     ]
 
+@pytest.fixture(autouse=True)
+def _clear_ref_cache():
+    """Сбрасывает кэш справочников GUI между тестами.
 
+    ref_cache._cache — модульный dict, в отличие от engine/сессии
+    не пересоздаётся автоматически на каждый тест. Без явного сброса
+    тест может увидеть данные из предыдущего теста, хотя у него уже
+    своя чистая in-memory БД.
+    """
+    from app.gui import ref_cache
+    ref_cache.invalidate_all()
+    yield
+    ref_cache.invalidate_all()
 # ---------- fixtures: stores ----------
 @pytest.fixture
 def single_store():

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, Optional, cast
 
 from PyQt6.QtCore import QDate
 from PyQt6.QtWidgets import (
@@ -25,15 +25,14 @@ from PyQt6.QtWidgets import (
 
 from app.crud import product_crud, store_crud
 from app.gui.qt_helpers import setup_searchable_combo
+from app.gui.ref_cache import get_cached
 from app.gui.table_model import DictTableModel
 from app.gui.tabs.common import list_items_safe, set_combo_by_data
 from app.models import Purchase
 from app.service.purchases import (
     create_purchase,
     delete_purchase,
-    get_purchase_by_product,
-    get_purchase_by_store,
-    list_purchases,
+    list_purchases_filtered,
     update_purchase,
 )
 
@@ -58,8 +57,12 @@ class PurchaseDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle('Покупка')
 
-        products = list_items_safe(product_crud, limit=5000)
-        stores = list_items_safe(store_crud, limit=5000)
+        products = get_cached(
+            'products', lambda: list_items_safe(product_crud, limit=5000)
+        )
+        stores = get_cached(
+            'stores', lambda: list_items_safe(store_crud, limit=5000)
+        )
 
         self.product_combo = QComboBox()
         self.store_combo = QComboBox()
@@ -350,12 +353,16 @@ class PurchasesTab(QWidget):
     def _load_filter_data(self) -> None:
         self.filter_product_combo.clear()
         self.filter_product_combo.addItem('— все продукты —', None)
-        for p in list_items_safe(product_crud, limit=5000):
+        for p in get_cached(
+            'products', lambda: list_items_safe(product_crud, limit=5000)
+        ):
             self.filter_product_combo.addItem(p.name, p.id)
 
         self.filter_store_combo.clear()
         self.filter_store_combo.addItem('— все магазины —', None)
-        for s in list_items_safe(store_crud, limit=5000):
+        for s in get_cached(
+            'stores', lambda: list_items_safe(store_crud, limit=5000)
+        ):
             self.filter_store_combo.addItem(s.name, s.id)
 
     def _selected_row(self) -> Optional[Dict[str, Any]]:
@@ -399,42 +406,18 @@ class PurchasesTab(QWidget):
         f = self._current_filters()
         sort_desc = f['sort_dir'] == 'desc'
 
-        items: List[Purchase]
+        order_by = (
+            Purchase.purchase_date.desc()
+            if sort_desc
+            else Purchase.purchase_date.asc()
+        )
 
-        if f['product_id'] is not None:
-            items = get_purchase_by_product(
-                product_id=f['product_id'],
-                from_date=f['from_date'],
-                to_date=f['to_date'],
-            )
-            if f['store_id'] is not None:
-                items = [p for p in items if p.store_id == f['store_id']]
-
-        elif f['store_id'] is not None:
-            items = get_purchase_by_store(store_id=f['store_id'])
-
-            if f['from_date'] is not None:
-                items = [p for p in items if p.purchase_date >= f['from_date']]
-            if f['to_date'] is not None:
-                items = [p for p in items if p.purchase_date <= f['to_date']]
-
-        else:
-            order_by = (
-                Purchase.purchase_date.desc()
-                if sort_desc
-                else Purchase.purchase_date.asc()
-            )
-            items = list_purchases(limit=5000, order_by=order_by)
-
-            if f['from_date'] is not None:
-                items = [p for p in items if p.purchase_date >= f['from_date']]
-            if f['to_date'] is not None:
-                items = [p for p in items if p.purchase_date <= f['to_date']]
-
-        items = sorted(
-            items,
-            key=lambda p: cast(date, p.purchase_date),
-            reverse=sort_desc,
+        items = list_purchases_filtered(
+            from_date=f['from_date'],
+            to_date=f['to_date'],
+            store_id=f['store_id'],
+            product_id=f['product_id'],
+            order_by=order_by,
         )
 
         rows = [p.to_dict() for p in items]

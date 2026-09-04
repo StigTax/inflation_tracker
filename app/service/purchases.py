@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import logging
 from datetime import date
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import func, select
 
 from app.core.db import get_session
+from app.crud import product_crud, store_crud
 from app.crud.purchases import crud as purchase_crud
 from app.logging import logged
 from app.models import Product, Purchase
@@ -17,7 +18,6 @@ from app.validate.validators import (
     validate_date_range,
     validate_positive_value,
 )
-from app.crud import product_crud, store_crud
 
 
 @logged(level=logging.INFO, skip_empty=True)
@@ -337,6 +337,7 @@ def list_purchases_filtered(
     product_ids: Optional[list[int]] = None,
     category_id: Optional[int] = None,
     is_promo: Optional[bool] = None,
+    order_by: Optional[Any] = None,
 ) -> list[Purchase]:
     """Универсальная выборка покупок для аналитики и UI-фильтров.
 
@@ -370,6 +371,7 @@ def list_purchases_filtered(
             product_ids=product_ids,
             category_id=category_id,
             is_promo=is_promo,
+            order_by=order_by,
         )
 
 def get_purchase_date_bounds() -> tuple[Optional[date], Optional[date]]:

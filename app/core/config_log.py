@@ -48,7 +48,7 @@ class ColoredConsoleHandler(logging.StreamHandler):
 def configure_logging(
     *,
     log_level: int = logging.DEBUG,
-    console_level: int = logging.INFO,
+    console_level: int = logging.DEBUG,
     enable_console: Optional[bool] = None,
     log_dir: Optional[Path] = None,
 ) -> Path:

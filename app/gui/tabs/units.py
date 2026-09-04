@@ -25,6 +25,7 @@ class UnitsTab(BaseCrudTab):
         'measure_type': 180,
         'unit': 100,
     }
+    cache_keys = ('units', 'products')
 
     delete_guards = [unit_has_no_products]
 

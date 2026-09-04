@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
 from app.crud import category_crud, product_crud, unit_crud
 from app.crud.base import CLEAR
 from app.gui.qt_helpers import setup_searchable_combo
+from app.gui.ref_cache import get_cached
 from app.gui.tabs.common import BaseCrudTab, list_items_safe, set_combo_by_data
 from app.models import Product
 from app.service.delete_guards import product_has_no_purchases
@@ -49,11 +50,15 @@ class ProductDialog(QDialog):
         )
 
         self.category_combo.addItem('— без категории —', None)
-        for c in list_items_safe(category_crud, limit=5000):
+        for c in get_cached(
+            'categories', lambda: list_items_safe(category_crud, limit=5000)
+        ):
             self.category_combo.addItem(c.name, c.id)
 
         self.unit_combo.addItem('— выбери единицу —', None)
-        for u in list_items_safe(unit_crud, limit=5000):
+        for u in get_cached(
+            'units', lambda: list_items_safe(unit_crud, limit=5000)
+        ):
             self.unit_combo.addItem(f'{u.measure_type} ({u.unit})', u.id)
 
         set_combo_by_data(self.category_combo, category_id)
@@ -131,6 +136,7 @@ class ProductsTab(BaseCrudTab):
         ('По категории: А→Я', ('category', 'asc')),
         ('По категории: Я→А', ('category', 'desc')),
     ]
+    cache_keys = ('products',)
 
     list_limit = 5000
     delete_guards = [product_has_no_purchases]
@@ -195,13 +201,17 @@ class ProductsTab(BaseCrudTab):
             self.filter_category_combo, placeholder='Категория…'
         )
         self.filter_category_combo.addItem('— все категории —', None)
-        for c in list_items_safe(category_crud, limit=5000):
+        for c in get_cached(
+            'categories', lambda: list_items_safe(category_crud, limit=5000)
+        ):
             self.filter_category_combo.addItem(c.name, c.name)
 
         self.filter_measure_type_combo = QComboBox()
         self.filter_measure_type_combo.addItem('— все типы —', None)
 
-        units = list_items_safe(unit_crud, limit=5000)
+        units = get_cached(
+            'units', lambda: list_items_safe(unit_crud, limit=5000)
+        )
         measure_types = sorted(
             {u.measure_type for u in units if u.measure_type}
         )
@@ -226,4 +236,3 @@ class ProductsTab(BaseCrudTab):
     def reset_extra_filters(self) -> None:
         self.filter_category_combo.setCurrentIndex(0)
         self.filter_measure_type_combo.setCurrentIndex(0)
-        self.filter_unit_combo.setCurrentIndex(0)

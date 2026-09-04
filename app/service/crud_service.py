@@ -5,10 +5,10 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Iterable, Optional, TypeVar
 
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from sqlalchemy import select
-from sqlalchemy import inspect as sa_inspect
 
 from app.core.db import get_session
 from app.crud.base import CLEAR

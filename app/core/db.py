@@ -9,7 +9,6 @@ from typing import Optional
 
 from sqlalchemy import Column, DateTime, Integer, create_engine, event
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import declarative_base, declared_attr, sessionmaker
 
 from app.core.settings import get_db_url

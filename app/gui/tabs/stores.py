@@ -36,6 +36,7 @@ class StoresTab(BaseCrudTab):
         ('По названию: А→Я', ('name', 'asc')),
         ('По названию: Я→А', ('name', 'desc')),
     ]
+    cache_keys = ('stores',)
 
     delete_guards = [store_has_no_purchases]
 
