@@ -29,7 +29,7 @@ jobs:
           python -m pip install -e ".[gui,packaging]"
         shell: pwsh
 
-      - name: Build with PyInstaller (onefile)
+      - name: Build with PyInstaller (onedir)
         run: |
             pyinstaller --noconfirm --clean `
             --name InflationTracker `
