@@ -5,6 +5,7 @@ from typing import Any, Dict, cast
 from PyQt6.QtWidgets import QDialog
 
 from app.crud import category_crud
+from app.crud.base import CLEAR
 from app.gui.tabs.common import BaseCrudTab, NameDescDialog
 from app.models import Category
 from app.service.delete_guards import category_has_no_products
@@ -56,5 +57,5 @@ class CategoriesTab(BaseCrudTab):
         name, desc = d.values()
         return {
             'name': name,
-            'description': desc,
+            'description': desc if desc is not None else CLEAR,
         }

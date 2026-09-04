@@ -15,6 +15,16 @@ ModelT = TypeVar('ModelT')
 logger = logging.getLogger(__name__)
 
 
+class _Clear:
+    """Сентинел: явно 'обнулить поле', в отличие от None ('не трогать')."""
+
+    def __repr__(self) -> str:
+        return 'CLEAR'
+
+
+CLEAR = _Clear()
+
+
 class CRUDBase(Generic[ModelT]):
     def __init__(
         self,
@@ -168,7 +178,9 @@ class CRUDBase(Generic[ModelT]):
         """
         obj = self.get_or_raise(db, obj_id)
         for name, value in fields.items():
-            if value is not None:
+            if value is CLEAR:
+                setattr(obj, name, None)
+            elif value is not None:
                 setattr(obj, name, value)
 
         if touch_updated_at and hasattr(obj, 'to_update'):

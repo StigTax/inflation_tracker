@@ -5,6 +5,7 @@ from typing import Any, Dict, cast
 from PyQt6.QtWidgets import QDialog
 
 from app.crud import store_crud
+from app.crud.base import CLEAR
 from app.gui.tabs.common import BaseCrudTab, NameDescDialog
 from app.models import Store
 from app.service.delete_guards import store_has_no_purchases
@@ -62,5 +63,5 @@ class StoresTab(BaseCrudTab):
         name, desc = d.values()
         return {
             'name': name,
-            'description': desc,
+            'description': desc if desc is not None else CLEAR,
         }

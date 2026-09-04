@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 )
 
 from app.crud import category_crud, product_crud, unit_crud
+from app.crud.base import CLEAR
 from app.gui.qt_helpers import setup_searchable_combo
 from app.gui.tabs.common import BaseCrudTab, list_items_safe, set_combo_by_data
 from app.models import Product
@@ -182,7 +183,7 @@ class ProductsTab(BaseCrudTab):
         name, category_id, unit_id = d.values()
         return {
             'name': name,
-            'category_id': category_id,
+            'category_id': category_id if category_id is not None else CLEAR,
             'unit_id': unit_id,
         }
 
