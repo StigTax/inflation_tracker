@@ -128,7 +128,7 @@ def unit_kg():
 @pytest.fixture
 def unit_l():
     return crud_service.create_item(
-        store_crud,
+        unit_crud,
         Unit(measure_type='объем', unit='л')
     )
 

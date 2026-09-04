@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from typing import Optional
 
 from sqlalchemy import (
     Boolean,
@@ -110,13 +111,45 @@ class Purchase(Base):
         if Decimal(value) < 0:
             raise ValueError(f'{key} не может быть отрицательным')
         return value
+    @staticmethod
+    def resolve_promo(
+        *,
+        is_promo: Optional[bool],
+        promo_type: Optional[str],
+        regular_unit_price: Optional[Decimal],
+        current_is_promo: bool,
+        current_promo_type: Optional[str],
+        current_regular_unit_price: Optional[Decimal],
+    ) -> tuple[bool, Optional[str], Optional[Decimal]]:
+        """Свести промо-поля к согласованному триплету.
 
-    @validates('is_promo')
-    def _validate_is_promo(self, key, value):
-        if not value:
-            self.promo_type = None
-            self.regular_unit_price = None
-        return value
+        Единое правило (раньше было продублировано в create_purchase,
+        update_purchase и валидаторе модели):
+        - is_promo=False сбрасывает promo_type/regular_unit_price;
+        - явные promo_type/regular_unit_price включают is_promo, даже
+          поверх is_promo=False в этом же вызове;
+        - непереданные (None) параметры не трогают текущее значение —
+          именно поэтому нужны current_* (для partial-update).
+        """
+        result_is_promo = current_is_promo
+        result_promo_type = current_promo_type
+        result_price = current_regular_unit_price
+
+        if is_promo is not None:
+            result_is_promo = is_promo
+            if not is_promo:
+                result_promo_type = None
+                result_price = None
+
+        if promo_type is not None:
+            result_promo_type = promo_type
+            result_is_promo = True
+
+        if regular_unit_price is not None:
+            result_price = regular_unit_price
+            result_is_promo = True
+
+        return result_is_promo, result_promo_type, result_price
 
     def to_dict(self) -> dict:
         product = self.product

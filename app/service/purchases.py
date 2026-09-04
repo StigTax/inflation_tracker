@@ -73,12 +73,14 @@ def create_purchase(
             regular_unit_price, 'Обычная цена за единицу'
         )
 
-    is_promo = bool(
-        is_promo or promo_type is not None or regular_unit_price is not None
+    is_promo, promo_type, regular_unit_price = Purchase.resolve_promo(
+        is_promo=is_promo,
+        promo_type=promo_type,
+        regular_unit_price=regular_unit_price,
+        current_is_promo=False,
+        current_promo_type=None,
+        current_regular_unit_price=None,
     )
-    if not is_promo:
-        promo_type = None
-        regular_unit_price = None
 
     purchase_date = validate_date_not_in_future(purchase_date)
 
@@ -174,19 +176,23 @@ def update_purchase(
             purchase_date=purchase_date,
         )
 
-        if is_promo is not None:
-            purchase.is_promo = is_promo
-            if not is_promo:
-                purchase.promo_type = None
-                purchase.regular_unit_price = None
-
-        if promo_type is not None:
-            purchase.promo_type = promo_type
-            purchase.is_promo = True
-
-        if regular_unit_price is not None:
-            purchase.regular_unit_price = regular_unit_price
-            purchase.is_promo = True
+        if (
+            is_promo is not None
+            or promo_type is not None
+            or regular_unit_price is not None
+        ):
+            (
+                purchase.is_promo,
+                purchase.promo_type,
+                purchase.regular_unit_price,
+            ) = Purchase.resolve_promo(
+                is_promo=is_promo,
+                promo_type=promo_type,
+                regular_unit_price=regular_unit_price,
+                current_is_promo=purchase.is_promo,
+                current_promo_type=purchase.promo_type,
+                current_regular_unit_price=purchase.regular_unit_price,
+            )
 
         db.commit()
         db.refresh(purchase)

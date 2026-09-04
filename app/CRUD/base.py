@@ -69,18 +69,15 @@ class CRUDBase(Generic[ModelT]):
                 f'{self.model.__name__} has no field \'{field}\''
             )
 
-        stmt = select(self.model.id, col)
+        stmt = select(col)
         if exclude_id is not None:
             stmt = stmt.where(self.model.id != exclude_id)
 
-        target = normalize_name(name).casefold()
-        for _id, existing in db.execute(stmt):
-            if isinstance(
-                existing,
-                str
-            ) and normalize_name(existing).casefold() == target:
-                return True
-        return False
+        target = normalize_name(name)
+        return any(
+            isinstance(existing, str) and normalize_name(existing) == target
+            for existing in db.scalars(stmt)
+         )
 
     def get_or_raise(
         self,
