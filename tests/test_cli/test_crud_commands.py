@@ -1,4 +1,4 @@
-"""Сквозной тест общего CLI-механизма (crud_commands) через сущность Category."""
+"""Сквозной тест общего CLI-механизма через сущность Category."""
 
 import pytest
 from app.cli.main import build_parser
