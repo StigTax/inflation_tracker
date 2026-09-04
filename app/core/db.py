@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import re
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Column, DateTime, Integer, create_engine
+from sqlalchemy import Column, DateTime, Integer, create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import declarative_base, declared_attr, sessionmaker
@@ -30,7 +30,7 @@ class PreBase:
     to_create = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
     )
     to_update = Column(DateTime, nullable=True)
 
@@ -57,10 +57,19 @@ def init_db(db_url: Optional[str] = None, echo: bool = False) -> None:
         DB_URL,
         echo=echo,
         connect_args=(
-            {'check_same_thread': False} if DB_URL.startswith('sqlite') else {}
+            {
+                'check_same_thread': False
+            } if DB_URL.startswith('sqlite') else {}
         ),
         future=True,
     )
+
+    if DB_URL.startswith('sqlite'):
+        @event.listens_for(_engine, 'connect')
+        def _enable_sqlite_fk(dbapi_connection, _record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute('PRAGMA foreign_keys=ON')
+            cursor.close()
 
     _SessionLocal = sessionmaker(
         bind=_engine,
@@ -92,23 +101,3 @@ def get_session():
         yield session
     finally:
         session.close()
-
-
-@contextmanager
-def session_scope():
-    """Скоуп для транзакций с rollback на ошибках.
-
-    Returns:
-        Session: SQLAlchemy session (context manager).
-    """
-    with get_session() as session:
-        try:
-            yield session
-        except IntegrityError as e:
-            session.rollback()
-            raise RuntimeError(
-                'Конфликт уникальности / целостности данных',
-            ) from e
-        except Exception:
-            session.rollback()
-            raise

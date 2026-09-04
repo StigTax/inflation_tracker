@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Generic, Optional, Type, TypeVar
 
 from sqlalchemy import select
@@ -181,7 +181,7 @@ class CRUDBase(Generic[ModelT]):
                 setattr(obj, name, value)
 
         if touch_updated_at and hasattr(obj, 'to_update'):
-            obj.to_update = datetime.utcnow()
+            obj.to_update = datetime.now(timezone.utc)
 
         if commit:
             db.commit()

@@ -17,6 +17,7 @@ from app.validate.validators import (
     validate_date_range,
     validate_positive_value,
 )
+from app.crud import product_crud, store_crud
 
 
 @logged(level=logging.INFO, skip_empty=True)
@@ -85,6 +86,8 @@ def create_purchase(
     purchase_date = validate_date_not_in_future(purchase_date)
 
     with get_session() as db:
+        product_crud.get_or_raise(db=db, obj_id=product_id)
+        store_crud.get_or_raise(db=db, obj_id=store_id)
         purchase = Purchase(
             store_id=store_id,
             product_id=product_id,
@@ -164,6 +167,10 @@ def update_purchase(
         )
 
     with get_session() as db:
+        if product_id is not None:
+            product_crud.get_or_raise(db=db, obj_id=product_id)
+        if store_id is not None:
+            store_crud.get_or_raise(db=db, obj_id=store_id)
         purchase = purchase_crud.update(
             db=db,
             obj_id=purchase_id,

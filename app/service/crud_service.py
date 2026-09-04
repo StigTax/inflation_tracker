@@ -7,8 +7,11 @@ from typing import Any, Callable, Iterable, Optional, TypeVar
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy import inspect as sa_inspect
 
 from app.core.db import get_session
+from app.crud.base import CLEAR
 from app.logging import logged
 from app.validate.exceptions import ObjectInUseError
 from app.validate.validators import (
@@ -96,6 +99,28 @@ def list_items(
         return items
 
 
+def _validate_foreign_keys(session: Session, obj: Any) -> None:
+    """Проверить, что все FK-поля объекта ссылаются на существующие строки.
+
+    Нужна как страховка независимо от PRAGMA foreign_keys — чтобы
+    пользователь увидел 'Category с ID 99 не найдена', а не голый
+    IntegrityError из драйвера.
+    """
+    mapper = sa_inspect(obj.__class__)
+    for column in mapper.columns:
+        for fk in column.foreign_keys:
+            value = getattr(obj, column.key, None)
+            if value is None:
+                continue
+            found = session.execute(
+                select(fk.column).where(fk.column == value)
+            ).first()
+            if found is None:
+                raise ValueError(
+                    f'{column.key}={value}: связанная запись не найдена.'
+                )
+
+
 @logged(level=logging.INFO, skip_empty=True)
 def create_item(
     crud,
@@ -144,6 +169,7 @@ def create_item(
                 validate_unique_name(
                     obj_in.name, exists
                 )
+                _validate_foreign_keys(session, obj_in)
                 return crud.create(
                     db=session, obj_in=obj_in
                 )
@@ -166,11 +192,30 @@ def create_item(
         )
 
     with get_session() as session:
+        _validate_foreign_keys(session, obj_in)
         item = crud.create(
             db=session,
             obj_in=obj_in,
         )
         return item
+
+
+def _validate_fk_fields(session: Session, model: type, fields: dict) -> None:
+    mapper = sa_inspect(model)
+    for column in mapper.columns:
+        for fk in column.foreign_keys:
+            if column.key not in fields:
+                continue
+            value = fields[column.key]
+            if value is None or value is CLEAR:
+                continue
+            found = session.execute(
+                select(fk.column).where(fk.column == value)
+            ).first()
+            if found is None:
+                raise ValueError(
+                    f'{column.key}={value}: связанная запись не найдена.'
+                )
 
 
 @logged(level=logging.INFO, skip_empty=True)
@@ -213,6 +258,7 @@ def update_item(
                     exclude_id=item_id
                 )
                 validate_unique_name(fields['name'], exists)
+                _validate_fk_fields(session, crud.model, fields)
                 return crud.update(db=session, obj_id=item_id, **fields)
 
     if 'unit' in fields and fields['unit'] is not None:
@@ -227,6 +273,7 @@ def update_item(
             'Тип единицы измерения'
         )
     with get_session() as session:
+        _validate_fk_fields(session, crud.model, fields)
         item = crud.update(
             db=session,
             obj_id=item_id,
