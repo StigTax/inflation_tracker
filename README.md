@@ -1,5 +1,8 @@
 # Трекер инфляции
 
+![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![Tests](https://github.com/StigTax/inflation_tracker/actions/workflows/tests.yml/badge.svg)
+
 Небольшое приложение для учёта покупок и анализа динамики цен.
 В проекте есть **CLI** для CRUD-операций и **GUI** на **PyQt6**.
 
@@ -11,6 +14,56 @@
 - Учёт покупок: дата, количество, сумма, комментарии, промо (если включено)
 - Аналитика и графики: динамика цен/инфляции по выбранным параметрам
 - CLI-режим подходит для автоматизации и скриптов
+
+## Технологический стек
+
+| Слой | Технологии |
+|---|---|
+| БД / ORM | SQLite, SQLAlchemy 2.0, Alembic (миграции) |
+| Бизнес-логика | Python 3.9+, pandas (аналитика, индексы цен) |
+| CLI | argparse, prettytable |
+| GUI | PyQt6, matplotlib |
+| Тесты / CI | pytest, pytest-cov, ruff, GitHub Actions |
+| Упаковка | PyInstaller (Windows .exe) |
+
+<details>
+<summary><b>Для технического ревью: архитектура и инженерные решения</b></summary>
+
+### Слои приложения
+
+```
+app/
+├── models/     # SQLAlchemy ORM-модели
+├── crud/       # низкоуровневые операции с БД (select/insert/update/delete)
+├── service/    # бизнес-правила, валидация, промо-логика, аналитика
+├── cli/        # argparse-обвязка над сервисным слоем
+└── gui/        # PyQt6-интерфейс над тем же сервисным слоем
+```
+
+CLI и GUI — два независимых клиента одного и того же сервисного слоя;
+ни один из них не обращается к CRUD или к БД напрямую.
+
+### Что может быть интересно при код-ревью
+
+- **Аналитика** (`service/analytics.py`) считает индексы цен, включая индекс
+  Ласпейреса, на pandas — по продукту, категории или магазину, с фильтрами
+  по периоду и промо-акциям.
+- **Промо-логика покупки** (`models/purchase.py::resolve_promo`) — правила
+  согласования `is_promo`/`promo_type`/`regular_unit_price` вынесены в один
+  метод вместо дублирования между созданием и обновлением записи.
+- **Guard'ы на удаление** (`service/delete_guards.py`) — прикладные проверки
+  перед удалением справочников (нельзя удалить категорию/магазин/единицу,
+  если на неё есть ссылки), не полагаемся только на ограничения БД.
+- **Логирование вызовов** (`logging/decorators.py`) — декоратор `@logged`
+  с безопасной сериализацией аргументов и результата (без падений на
+  тяжёлых ORM-объектах) и таймингом на старт/успех/ошибку.
+- **Кэш справочников в GUI** (`gui/ref_cache.py`) — простой in-memory кэш
+  с явной инвалидацией после изменений, без TTL и скрытой магии.
+- **Тесты и CI**: pytest + pytest-cov на сервисный слой и CLI, `ruff` —
+  в GitHub Actions на каждый PR; миграции Alembic упаковываются прямо
+  в exe-сборку через PyInstaller.
+
+</details>
 
 ---
 
@@ -72,8 +125,8 @@ Python 3.9+
 ```bash
 python -m venv .venv
 
-# Windows (PowerShell):
-.venv\Scripts\Activate.ps1
+# Windows (bash, например Git Bash):
+source .venv/Scripts/activate
 
 # Linux/macOS:
 source .venv/bin/activate
@@ -147,7 +200,18 @@ python -m app.cli.main purchase list \
 
 ## Скриншоты GUI
 
-Файлы лежат в docs/screenshots/.
+![Главный экран — аналитика](docs/screenshots/main.png)
+
+<details>
+<summary>Ещё скриншоты (CRUD-вкладки: категории, продукты, покупки, магазины, единицы)</summary>
+
+![Категории](docs/screenshots/category_crud.png)
+![Продукты](docs/screenshots/product_crud.png)
+![Покупки](docs/screenshots/purchase_crud.png)
+![Магазины](docs/screenshots/store_crud.png)
+![Единицы измерения](docs/screenshots/unit_crud.png)
+
+</details>
 
 ---
 
