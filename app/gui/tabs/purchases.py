@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from app.core.constants import PURCHASES_PAGE_SIZE
 from app.crud import product_crud, store_crud
 from app.gui.qt_helpers import setup_searchable_combo
 from app.gui.ref_cache import get_cached
@@ -30,6 +31,7 @@ from app.gui.table_model import DictTableModel
 from app.gui.tabs.common import list_items_safe, set_combo_by_data
 from app.models import Purchase
 from app.service.purchases import (
+    count_purchases_filtered,
     create_purchase,
     delete_purchase,
     list_purchases_filtered,
@@ -216,6 +218,9 @@ class PurchasesTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        self._page = 0
+        self._total = 0
+
         self.table = QTableView()
         self.model = DictTableModel(
             columns=[
@@ -286,7 +291,7 @@ class PurchasesTab(QWidget):
 
         btn_apply = QPushButton('Применить')
         btn_reset = QPushButton('Сброс')
-        btn_apply.clicked.connect(self.reload)
+        btn_apply.clicked.connect(self.on_apply_filters)
         btn_reset.clicked.connect(self.on_reset_filters)
 
         filter_row = QHBoxLayout()
@@ -307,9 +312,19 @@ class PurchasesTab(QWidget):
         filter_row.addWidget(btn_reset)
 
         self.count_label = QLabel('Показано покупок: 0')
+
+        self.btn_prev_page = QPushButton('← Назад')
+        self.btn_next_page = QPushButton('Вперёд →')
+        self.page_label = QLabel('Стр. 1 из 1')
+        self.btn_prev_page.clicked.connect(self._go_prev_page)
+        self.btn_next_page.clicked.connect(self._go_next_page)
+
         bottom = QHBoxLayout()
         bottom.addWidget(self.count_label)
         bottom.addStretch(1)
+        bottom.addWidget(self.btn_prev_page)
+        bottom.addWidget(self.page_label)
+        bottom.addWidget(self.btn_next_page)
 
         layout = QVBoxLayout()
         layout.addLayout(crud_row)
@@ -390,6 +405,15 @@ class PurchasesTab(QWidget):
             'sort_dir': sort_dir,
         }
 
+    def on_apply_filters(self) -> None:
+        """Применить фильтры/сортировку и вернуться на первую страницу.
+
+        Без сброса страницы можно словить пустую таблицу: стоишь на
+        странице 5, меняешь фильтр — а под него страниц всего 2.
+        """
+        self._page = 0
+        self.reload()
+
     def on_reset_filters(self) -> None:
         set_combo_by_data(self.filter_product_combo, None)
         set_combo_by_data(self.filter_store_combo, None)
@@ -400,7 +424,24 @@ class PurchasesTab(QWidget):
         self.filter_from.setDate(QDate(today.year, today.month, 1))
         self.filter_to.setDate(QDate(today.year, today.month, today.day))
 
+        self._page = 0
         self.reload()
+
+    def _max_page(self) -> int:
+        """Номер последней доступной страницы (с нуля) при self._total."""
+        if self._total == 0:
+            return 0
+        return (self._total - 1) // PURCHASES_PAGE_SIZE
+
+    def _go_prev_page(self) -> None:
+        if self._page > 0:
+            self._page -= 1
+            self.reload()
+
+    def _go_next_page(self) -> None:
+        if self._page < self._max_page():
+            self._page += 1
+            self.reload()
 
     def reload(self) -> None:
         f = self._current_filters()
@@ -412,17 +453,38 @@ class PurchasesTab(QWidget):
             else Purchase.purchase_date.asc()
         )
 
-        items = list_purchases_filtered(
+        filter_kwargs = dict(
             from_date=f['from_date'],
             to_date=f['to_date'],
             store_id=f['store_id'],
             product_id=f['product_id'],
+        )
+
+        self._total = count_purchases_filtered(**filter_kwargs)
+
+        # Страница могла "уехать" за пределы выборки — например,
+        # удалили последнюю покупку на последней странице, и страниц
+        # стало меньше, чем текущий номер. Схлопываем на валидную.
+        self._page = min(self._page, self._max_page())
+
+        items = list_purchases_filtered(
+            **filter_kwargs,
             order_by=order_by,
+            offset=self._page * PURCHASES_PAGE_SIZE,
+            limit=PURCHASES_PAGE_SIZE,
         )
 
         rows = [p.to_dict() for p in items]
         self.model.set_rows(rows)
-        self.count_label.setText(f'Показано покупок: {len(rows)}')
+
+        total_pages = self._max_page() + 1
+        start = self._page * PURCHASES_PAGE_SIZE + 1 if self._total else 0
+        end = start + len(rows) - 1 if rows else 0
+        self.count_label.setText(f'Показано {start}–{end} из {self._total}')
+        self.page_label.setText(f'Стр. {self._page + 1} из {total_pages}')
+
+        self.btn_prev_page.setEnabled(self._page > 0)
+        self.btn_next_page.setEnabled(self._page < self._max_page())
 
     def on_add(self) -> None:
         if not list_items_safe(product_crud, limit=1):
