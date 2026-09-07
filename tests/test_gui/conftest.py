@@ -79,3 +79,17 @@ def filled_dialog(qtbot, product_vegetable, few_stores):
     )
     qtbot.addWidget(dlg)
     return dlg
+
+@pytest.fixture
+def critical_calls(monkeypatch):
+    """Перехватывает QMessageBox.critical(), отдаёт список вызовов.
+
+    Нужен там, где ошибка не блокирует форму (как warning), а сообщает
+    о сбое операции — например, падение фонового расчёта аналитики.
+    """
+    calls = []
+    monkeypatch.setattr(
+        QMessageBox, 'critical',
+        staticmethod(lambda *a, **kw: calls.append(a)),
+    )
+    return calls

@@ -503,6 +503,8 @@ class AnalyticsWidget(QWidget):
         один и тот же self.figure/self.canvas, порядок отрисовки был
         бы непредсказуем.
         """
+        if self._task_runner.is_running():
+            return
         self._set_busy(True)
         started = self._task_runner.run(
             fn,
