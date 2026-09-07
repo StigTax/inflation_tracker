@@ -338,6 +338,8 @@ def list_purchases_filtered(
     category_id: Optional[int] = None,
     is_promo: Optional[bool] = None,
     order_by: Optional[Any] = None,
+    offset: Optional[int] = None,
+    limit: Optional[int] = None,
 ) -> list[Purchase]:
     """Универсальная выборка покупок для аналитики и UI-фильтров.
 
@@ -348,6 +350,11 @@ def list_purchases_filtered(
     - категории (через join с Product);
     - признаку акции.
 
+    offset/limit по умолчанию не заданы (None) — analytics.py вызывает
+    эту функцию без них и получает, как и раньше, полную отфильтрованную
+    выборку целиком. Постранично выбирает только GUI (PurchasesTab),
+    явно передавая offset/limit.
+
     Args:
         from_date: Начальная дата периода.
         to_date: Конечная дата периода.
@@ -356,6 +363,9 @@ def list_purchases_filtered(
         product_ids: Список ID продуктов (корзина/выборка).
         category_id: ID категории.
         is_promo: Фильтр по акциям (True/False) или None — без фильтра.
+        order_by: Сортировка.
+        offset: Смещение выборки (для пагинации).
+        limit: Максимум записей (для пагинации).
 
     Returns:
         list[Purchase]: Список покупок, подходящих под фильтры.
@@ -372,7 +382,42 @@ def list_purchases_filtered(
             category_id=category_id,
             is_promo=is_promo,
             order_by=order_by,
+            offset=offset,
+            limit=limit,
         )
+
+
+@logged(level=logging.DEBUG, skip_empty=True)
+def count_purchases_filtered(
+    *,
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None,
+    store_id: Optional[int] = None,
+    product_id: Optional[int] = None,
+    product_ids: Optional[list[int]] = None,
+    category_id: Optional[int] = None,
+    is_promo: Optional[bool] = None,
+) -> int:
+    """Считает покупки под теми же фильтрами, что list_purchases_filtered().
+
+    Нужно GUI для расчёта количества страниц.
+
+    Returns:
+        int: Количество подходящих покупок.
+    """
+    from_date, to_date = validate_date_range(from_date, to_date)
+    with get_session() as db:
+        return purchase_crud.count_filtered(
+            db=db,
+            date_from=from_date,
+            date_to=to_date,
+            store_id=store_id,
+            product_id=product_id,
+            product_ids=product_ids,
+            category_id=category_id,
+            is_promo=is_promo,
+        )
+
 
 def get_purchase_date_bounds() -> tuple[Optional[date], Optional[date]]:
     """Возвращает минимальную и максимальную дату покупок.

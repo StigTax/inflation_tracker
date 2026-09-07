@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.crud.base import CRUDBase
@@ -109,9 +109,8 @@ class PurchaseCRUD(CRUDBase[Purchase]):
         stmt = self._with_relations(stmt.order_by(Purchase.purchase_date))
         return list(db.scalars(stmt).all())
 
-    def list_filtered(
+    def _build_filtered_where(
         self,
-        db: Session,
         *,
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
@@ -120,12 +119,17 @@ class PurchaseCRUD(CRUDBase[Purchase]):
         product_ids: Optional[list[int]] = None,
         category_id: Optional[int] = None,
         is_promo: Optional[bool] = None,
-        order_by=None,
-    ) -> list[Purchase]:
-        """Универсальная выборка покупок для аналитики.
+    ) -> Select:
+        """Строит SELECT(Purchase) с применёнными фильтрами.
+
+        Без order_by/offset/limit — это общий кусок для list_filtered()
+        и count_filtered(). Фильтры должны применяться идентично в обоих
+        местах: если поправить условие в одном и забыть про другое,
+        получишь ситуацию "на странице показано 25 из заявленных 40,
+        а по факту под фильтр попадает 38" — и такой баг не поймать
+        глазами, только сверкой чисел.
 
         Args:
-            db: Сессия SQLAlchemy.
             date_from: Начальная дата.
             date_to: Конечная дата.
             store_id: Идентификатор магазина.
@@ -133,10 +137,9 @@ class PurchaseCRUD(CRUDBase[Purchase]):
             product_ids: Список идентификаторов продуктов.
             category_id: Идентификатор категории.
             is_promo: Фильтр по акциям.
-            order_by: Поле сортировки.
 
         Returns:
-            list[Purchase]: Список покупок.
+            Select: Незавершённый SELECT с WHERE-условиями.
         """
         stmt = select(Purchase)
 
@@ -164,11 +167,101 @@ class PurchaseCRUD(CRUDBase[Purchase]):
         if date_to is not None:
             stmt = stmt.where(Purchase.purchase_date <= date_to)
 
+        return stmt
+
+    def list_filtered(
+        self,
+        db: Session,
+        *,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        store_id: Optional[int] = None,
+        product_id: Optional[int] = None,
+        product_ids: Optional[list[int]] = None,
+        category_id: Optional[int] = None,
+        is_promo: Optional[bool] = None,
+        order_by=None,
+        offset: Optional[int] = None,
+        limit: Optional[int] = None,
+    ) -> list[Purchase]:
+        """Универсальная выборка покупок для аналитики и UI.
+
+        offset/limit по умолчанию не заданы (None) — это осознанно:
+        аналитика (Ласпейрес) считает по ВСЕЙ отфильтрованной выборке,
+        и молчаливая пагинация тут была бы багом в расчётах, а не
+        оптимизацией. Постранично выбирает только GUI, явно передавая
+        offset/limit.
+
+        Args:
+            db: Сессия SQLAlchemy.
+            date_from: Начальная дата.
+            date_to: Конечная дата.
+            store_id: Идентификатор магазина.
+            product_id: Идентификатор продукта.
+            product_ids: Список идентификаторов продуктов.
+            category_id: Идентификатор категории.
+            is_promo: Фильтр по акциям.
+            order_by: Поле сортировки.
+            offset: Смещение выборки (для пагинации). None — без смещения.
+            limit: Максимум записей (для пагинации). None — без лимита.
+
+        Returns:
+            list[Purchase]: Список покупок.
+        """
+        stmt = self._build_filtered_where(
+            date_from=date_from,
+            date_to=date_to,
+            store_id=store_id,
+            product_id=product_id,
+            product_ids=product_ids,
+            category_id=category_id,
+            is_promo=is_promo,
+        )
+
         stmt = stmt.order_by(
             order_by if order_by is not None else Purchase.purchase_date
         )
+
+        if offset is not None:
+            stmt = stmt.offset(offset)
+        if limit is not None:
+            stmt = stmt.limit(limit)
+
         stmt = self._with_relations(stmt)
         return list(db.scalars(stmt).all())
+
+    def count_filtered(
+        self,
+        db: Session,
+        *,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        store_id: Optional[int] = None,
+        product_id: Optional[int] = None,
+        product_ids: Optional[list[int]] = None,
+        category_id: Optional[int] = None,
+        is_promo: Optional[bool] = None,
+    ) -> int:
+        """Считает, сколько покупок подходит под те же фильтры.
+
+        Использует тот же _build_filtered_where(), что и list_filtered(),
+        поэтому число всегда согласовано с тем, что реально можно
+        получить постранично.
+
+        Returns:
+            int: Количество покупок, подходящих под фильтры.
+        """
+        stmt = self._build_filtered_where(
+            date_from=date_from,
+            date_to=date_to,
+            store_id=store_id,
+            product_id=product_id,
+            product_ids=product_ids,
+            category_id=category_id,
+            is_promo=is_promo,
+        )
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        return db.scalar(count_stmt) or 0
 
 
 crud = PurchaseCRUD(Purchase)

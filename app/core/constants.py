@@ -12,6 +12,8 @@ CLI_DEFAULT_OFFSET = 0
 CLI_DEFAULT_LIMIT = 100
 CLI_VERBOSE_SEPARATOR_LEN = 40
 
+PURCHASES_PAGE_SIZE = 25
+
 LOG_FORMAT = '%(asctime)s - [%(levelname)s] - %(funcName)s: %(message)s'
 DT_FORMAT = '%d.%m.%Y %H:%M:%S'
 
