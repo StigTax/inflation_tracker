@@ -28,11 +28,13 @@ from app.crud import product_crud, store_crud
 from app.gui.qt_helpers import setup_searchable_combo
 from app.gui.ref_cache import get_cached
 from app.gui.table_model import DictTableModel
+from app.gui.tabs.batch_purchase import BatchPurchaseDialog
 from app.gui.tabs.common import list_items_safe, set_combo_by_data
 from app.models import Purchase
 from app.service.purchases import (
     count_purchases_filtered,
     create_purchase,
+    create_purchases_batch,
     delete_purchase,
     list_purchases_filtered,
     update_purchase,
@@ -245,15 +247,18 @@ class PurchasesTab(QWidget):
         self._apply_table_layout()
 
         btn_add = QPushButton('Добавить')
+        btn_batch_add = QPushButton('Пакетный ввод…')
         btn_edit = QPushButton('Редактировать')
         btn_del = QPushButton('Удалить')
 
         btn_add.clicked.connect(self.on_add)
+        btn_batch_add.clicked.connect(self.on_batch_add)
         btn_edit.clicked.connect(self.on_edit)
         btn_del.clicked.connect(self.on_delete)
 
         crud_row = QHBoxLayout()
         crud_row.addWidget(btn_add)
+        crud_row.addWidget(btn_batch_add)
         crud_row.addWidget(btn_edit)
         crud_row.addWidget(btn_del)
         crud_row.addStretch(1)
@@ -520,6 +525,40 @@ class PurchasesTab(QWidget):
                 regular_unit_price=v['regular_unit_price'],
             )
             self.reload()
+        except Exception as e:
+            QMessageBox.critical(self, 'Ошибка', str(e))
+
+    def on_batch_add(self) -> None:
+        if not list_items_safe(product_crud, limit=1):
+            QMessageBox.warning(
+                self,
+                'Нельзя',
+                'Сначала создай хотя бы один продукт.'
+            )
+            return
+        if not list_items_safe(store_crud, limit=1):
+            QMessageBox.warning(
+                self,
+                'Нельзя',
+                'Сначала создай хотя бы один магазин.'
+            )
+            return
+
+        dlg = BatchPurchaseDialog(self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        v = dlg.values()
+        try:
+            created = create_purchases_batch(
+                store_id=v['store_id'],
+                purchase_date=v['purchase_date'],
+                rows=v['rows'],
+            )
+            self.reload()
+            QMessageBox.information(
+                self, 'Готово', f'Добавлено покупок: {created}.'
+            )
         except Exception as e:
             QMessageBox.critical(self, 'Ошибка', str(e))
 

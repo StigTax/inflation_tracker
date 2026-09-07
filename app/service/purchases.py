@@ -105,6 +105,93 @@ def create_purchase(
             obj_id=created.id,
         )
 
+@logged(level=logging.INFO, skip_empty=True)
+def create_purchases_batch(
+    *,
+    store_id: int,
+    purchase_date: Optional[date] = None,
+    rows: list[dict[str, Any]],
+) -> int:
+    """Создать несколько покупок одним пакетом: общие дата и магазин,
+    свои продукт/количество/цена (+опц. промо) на каждую строку.
+
+    Атомарно: либо создаются ВСЕ строки партии, либо ни одной. Без
+    этого, если строка №7 из десяти окажется невалидной (например,
+    ссылается на уже удалённый продукт), первые шесть уже осели бы в
+    БД — пользователь получил бы наполовину сохранённый чек без явного
+    предупреждения, что часть товаров потерялась. Атомарность здесь не
+    требует ручного BEGIN/ROLLBACK: пока не вызван db.commit(), выход
+    из `with get_session()` с исключением закрывает сессию, а
+    Session.close() сам откатывает все незакоммиченные db.add().
+
+    Args:
+        store_id: Общий магазин для всех строк партии.
+        purchase_date: Общая дата покупки (по умолчанию — сегодня).
+        rows: Список словарей вида {
+            'product_id': int, 'quantity': float, 'price': float,
+            'comment': Optional[str], 'is_promo': bool,
+            'promo_type': Optional[str],
+            'regular_unit_price': Optional[float],
+        }. Ключи 'comment'/'is_promo'/'promo_type'/'regular_unit_price'
+        необязательны.
+
+    Returns:
+        int: Количество созданных покупок (== len(rows)).
+
+    Raises:
+        ValueError: Если rows пуст, магазин/продукт не найден, либо
+        какое-то значение невалидно — откатывает всю партию.
+    """
+    if not rows:
+        raise ValueError('Пустая партия: нечего сохранять.')
+
+    purchase_date = validate_date_not_in_future(purchase_date)
+
+    with get_session() as db:
+        store_crud.get_or_raise(db=db, obj_id=store_id)
+
+        for i, row in enumerate(rows, start=1):
+            try:
+                product_id = row['product_id']
+                quantity = validate_positive_value(
+                    row['quantity'], 'Количество товара'
+                )
+                price = validate_positive_value(
+                    row['price'], 'Стоимость товара'
+                )
+                regular_unit_price = row.get('regular_unit_price')
+                if regular_unit_price is not None:
+                    regular_unit_price = validate_positive_value(
+                        regular_unit_price, 'Обычная цена за единицу'
+                    )
+                product_crud.get_or_raise(db=db, obj_id=product_id)
+            except (ValueError, KeyError) as e:
+                raise ValueError(f'Строка {i}: {e}') from e
+
+            is_promo, promo_type, regular_unit_price = Purchase.resolve_promo(
+                is_promo=row.get('is_promo', False),
+                promo_type=row.get('promo_type'),
+                regular_unit_price=regular_unit_price,
+                current_is_promo=False,
+                current_promo_type=None,
+                current_regular_unit_price=None,
+            )
+
+            db.add(Purchase(
+                store_id=store_id,
+                product_id=product_id,
+                quantity=quantity,
+                total_price=price,
+                purchase_date=purchase_date,
+                comment=row.get('comment'),
+                is_promo=is_promo,
+                promo_type=promo_type,
+                regular_unit_price=regular_unit_price,
+            ))
+
+        db.commit()
+
+    return len(rows)
 
 @logged(level=logging.INFO, skip_empty=True)
 def update_purchase(

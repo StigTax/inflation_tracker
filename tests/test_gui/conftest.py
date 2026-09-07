@@ -93,3 +93,18 @@ def critical_calls(monkeypatch):
         staticmethod(lambda *a, **kw: calls.append(a)),
     )
     return calls
+
+@pytest.fixture
+def information_calls(monkeypatch):
+    """Перехватывает QMessageBox.information(), отдаёт список вызовов.
+
+    Для нейтральных подсказок вроде "выбери строку в таблице" или
+    "добавь хотя бы одну строку" — это не ошибка и не предупреждение
+    о невалидности, просто мягкая подсказка пользователю.
+    """
+    calls = []
+    monkeypatch.setattr(
+        QMessageBox, 'information',
+        staticmethod(lambda *a, **kw: calls.append(a)),
+    )
+    return calls
