@@ -16,6 +16,7 @@ guiqwt==4.4.5
 h5py==3.14.0
 idna==3.11
 importlib_resources==6.5.2
+-e git+ssh://git@github.com/StigTax/inflation_tracker.git@f898a0fbf25ab3557d383302bd56f787ae2c7c9f#egg=inflation_tracker
 iniconfig==2.1.0
 kiwisolver==1.4.7
 lsprotocol==2025.0.0
@@ -42,6 +43,7 @@ PyQt6-Qt6==6.10.1
 PyQt6_sip==13.10.2
 pytest==8.4.2
 pytest-cov==7.0.0
+pytest-qt==4.5.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
 PythonQwt==0.15.0
@@ -52,7 +54,7 @@ ruff==0.14.13
 ruff-lsp==0.0.62
 scipy==1.13.1
 six==1.17.0
-SQLAlchemy==2.0.44
+SQLAlchemy==2.0.52
 tomli==2.3.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0

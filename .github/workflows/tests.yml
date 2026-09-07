@@ -25,10 +25,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[testing,dev]"
+          pip install -e ".[testing,dev,gui]"
 
       - name: Lint (ruff)
         run: ruff check app/ tests/
 
       - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: pytest -q --cov=app --cov-report=term-missing

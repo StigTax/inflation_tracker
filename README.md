@@ -131,7 +131,7 @@ source .venv/Scripts/activate
 # Linux/macOS:
 source .venv/bin/activate
 
-pip install -r requirements.txt
+pip install -e ".[testing,dev,gui]"
 ```
 
 ### Запуск
