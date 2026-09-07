@@ -7,8 +7,10 @@ import matplotlib.dates as mdates
 import pandas as pd
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PyQt6.QtCore import QDate
+from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtGui import QGuiApplication, QPalette
 from PyQt6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QDateEdit,
@@ -41,6 +43,66 @@ _GROUP_FREQ = {
     'Месяц': 'month',
     'Год': 'year',
 }
+
+# Насколько большим должен быть разрыв между соседними точками (в днях),
+# чтобы график перестал соединять их линией. Идея: если между покупками
+# прошло, скажем, три месяца при дневной группировке, прямая линия между
+# ними — чистый домысел matplotlib, а не реальный тренд. Эвристика,
+# можно подстроить под свои привычки покупок.
+_GAP_BREAK_DAYS = {
+    'day': 21,
+    'week': 45,
+    'month': 95,
+    'year': 550,
+}
+
+# Подписывать цену над точками только пока их немного — иначе подписи
+# налезают друг на друга и превращают график в кашу. При дневной
+# группировке за год это могут быть сотни точек.
+_MAX_ANNOTATED_POINTS = 15
+
+_LIGHT_COLORS = {
+    'figure_bg': '#ffffff',
+    'axes_bg': '#ffffff',
+    'text': '#1a1a1a',
+    'grid': '#cfcfcf',
+    'line': '#1f77b4',
+    'baseline': '#7a7a7a',
+}
+
+_DARK_COLORS = {
+    'figure_bg': '#232629',
+    'axes_bg': '#232629',
+    'text': '#e6e6e6',
+    'grid': '#4a4d50',
+    'line': '#5fa8ff',
+    'baseline': '#9a9da0',
+}
+
+
+def _is_dark_mode() -> bool:
+    """Определяет, активна ли сейчас тёмная системная тема.
+
+    Основной способ — QGuiApplication.styleHints().colorScheme()
+    (доступно с Qt 6.5): читает системную настройку темы напрямую,
+    без всякого угадывания. Фолбэк — светлота цвета окна из текущей
+    палитры приложения; срабатывает, если платформа/версия Qt почему-то
+    вернула Unknown вместо реальной схемы.
+    """
+    try:
+        scheme = QGuiApplication.styleHints().colorScheme()
+        if scheme == Qt.ColorScheme.Dark:
+            return True
+        if scheme == Qt.ColorScheme.Light:
+            return False
+    except Exception:
+        pass
+
+    app = QApplication.instance()
+    if app is None:
+        return False
+    window_color = app.palette().color(QPalette.ColorRole.Window)
+    return window_color.lightness() < 128
 
 
 class AnalyticsWidget(QWidget):
@@ -134,6 +196,8 @@ class AnalyticsWidget(QWidget):
         self.figure = Figure(figsize=(6, 4))
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
+        self._theme = _LIGHT_COLORS
+        self._apply_theme()
 
         self.kpi = QLabel('Выбери параметры и нажми «Построить».')
         self.kpi.setWordWrap(True)
@@ -282,6 +346,8 @@ class AnalyticsWidget(QWidget):
         self._reload_combos()
         self._init_date_bounds()
 
+    # ------------------- kind switching -------------------
+
     def _on_kind_changed(self) -> None:
         """Реакция на смену типа аналитики.
 
@@ -342,6 +408,43 @@ class AnalyticsWidget(QWidget):
             ids.append(int(p))
         return ids or None
 
+    def _clean_product_label(self, product_id: int) -> str:
+        """Имя продукта для заголовка графика, без счётчика "— N покупок".
+
+        currentText() комбобокса для этого не годится: там формат
+        "Название (ед.) — N", где N — число покупок для UI-подсказки в
+        выпадающем списке. В заголовке графика это "— N" выглядит как
+        часть названия товара, а не как метаинформация.
+        """
+        for p in get_cached(
+            'products', lambda: list_items(product_crud, limit=5000)
+        ):
+            if p.id == product_id:
+                unit = (
+                    f'{p.unit.measure_type} {p.unit.unit}'
+                    if getattr(p, 'unit', None) else ''
+                )
+                return f'{p.name} ({unit})' if unit else p.name
+        return 'Продукт'
+
+    def _clean_category_label(self, category_id: int) -> str:
+        """Имя категории для заголовка графика, без счётчика покупок."""
+        for c in get_cached(
+            'categories', lambda: list_items(category_crud, limit=5000)
+        ):
+            if c.id == category_id:
+                return c.name
+        return 'Категория'
+
+    def _clean_store_label(self, store_id: int) -> str:
+        """Имя магазина для заголовка графика, без счётчика покупок."""
+        for s in get_cached(
+            'stores', lambda: list_items(store_crud, limit=5000)
+        ):
+            if s.id == store_id:
+                return s.name
+        return 'Магазин'
+
     # ------------------- build + plots -------------------
 
     def build(self) -> None:
@@ -386,7 +489,7 @@ class AnalyticsWidget(QWidget):
                         'Сначала выбери продукт.'
                     )
                     return
-                obj_name = self.product_combo.currentText()
+                obj_name = self._clean_product_label(int(product_id))
                 title = self._build_plot_title(
                     kind=kind,
                     obj_name=obj_name,
@@ -420,7 +523,7 @@ class AnalyticsWidget(QWidget):
                         'Сначала выбери категорию.'
                     )
                     return
-                obj_name = self.category_combo.currentText()
+                obj_name = self._clean_category_label(int(category_id))
                 title = self._build_plot_title(
                     kind=kind,
                     obj_name=obj_name,
@@ -453,7 +556,7 @@ class AnalyticsWidget(QWidget):
                         'Сначала выбери магазин.'
                     )
                     return
-                obj_name = self.store_combo.currentText()
+                obj_name = self._clean_store_label(int(store_id))
                 title = self._build_plot_title(
                     kind=kind,
                     obj_name=obj_name,
@@ -504,19 +607,20 @@ class AnalyticsWidget(QWidget):
         бы непредсказуем.
         """
         if self._task_runner.is_running():
+            # Уже что-то считается — новый клик поверх молча игнорируем,
+            # не трогая текущее busy-состояние. Раньше здесь по ветке
+            # "не удалось запустить" ошибочно вызывался _set_busy(False),
+            # что снимало disable с кнопки, пока реальный расчёт ещё шёл.
             return
+
         self._set_busy(True)
-        started = self._task_runner.run(
+        self._task_runner.run(
             fn,
             on_success=on_success,
             on_error=self._on_build_failed,
             on_finished=lambda: self._set_busy(False),
             **kwargs,
         )
-        if not started:
-            # На практике сюда не попасть, пока кнопка задизейблена,
-            # но не оставляем busy=True навечно, если всё же попали.
-            self._set_busy(False)
 
     def _on_build_failed(self, message: str) -> None:
         """Слот failed — вызывается в основном потоке (Qt queued connection).
@@ -550,6 +654,30 @@ class AnalyticsWidget(QWidget):
         """
         self.figure.clear()
         self.ax = self.figure.add_subplot(111)
+        self._apply_theme()
+
+    def _apply_theme(self) -> None:
+        """Красит фигуру/оси под текущую системную тему.
+
+        matplotlib понятия не имеет о теме Qt-приложения — рисует
+        всегда чёрным по белому, пока ему явно не сказать иначе.
+        Вызывается при каждом _reset_axes(), поэтому смена темы ОС
+        подхватится на следующем построении графика (не мгновенно —
+        живое обновление уже открытого графика без пересчёта данных
+        сюда не входило, это отдельная и не факт что нужная фича).
+        """
+        self._theme = _DARK_COLORS if _is_dark_mode() else _LIGHT_COLORS
+
+        self.figure.patch.set_facecolor(self._theme['figure_bg'])
+        self.ax.set_facecolor(self._theme['axes_bg'])
+
+        for spine in self.ax.spines.values():
+            spine.set_color(self._theme['grid'])
+
+        self.ax.tick_params(colors=self._theme['text'])
+        self.ax.xaxis.label.set_color(self._theme['text'])
+        self.ax.yaxis.label.set_color(self._theme['text'])
+        self.ax.title.set_color(self._theme['text'])
 
     def _format_xaxis(self) -> None:
         """Ставит аккуратный автолокатор/форматтер дат для оси X."""
@@ -557,6 +685,43 @@ class AnalyticsWidget(QWidget):
         formatter = mdates.ConciseDateFormatter(locator)
         self.ax.xaxis.set_major_locator(locator)
         self.ax.xaxis.set_major_formatter(formatter)
+
+    def _annotate_prices(
+        self, dfp: pd.DataFrame, mask: pd.Series, x_list: list, y_list: list
+    ) -> None:
+        """Подписывает фактическую цену за единицу над каждой точкой.
+
+        Есть только у product_index — там один товар, одна цена за
+        период, подпись однозначна. У category_index/store_index точка
+        графика — это взвешенный индекс Ласпейреса по КОРЗИНЕ разных
+        товаров с разными единицами измерения; единой "цены" для такой
+        точки просто не существует, поэтому там аннотаций нет — и не
+        должно быть, а не "забыли добавить".
+
+        Молчит и при большом числе точек (> _MAX_ANNOTATED_POINTS) —
+        иначе подписи налезают друг на друга плотнее, чем сами точки.
+        """
+        if 'avg_unit_price' not in dfp.columns:
+            return
+        if len(x_list) > _MAX_ANNOTATED_POINTS:
+            return
+
+        prices = pd.to_numeric(dfp['avg_unit_price'], errors='coerce')[
+            mask
+        ].tolist()
+
+        for xi, yi, price in zip(x_list, y_list, prices):
+            if price is None or pd.isna(price):
+                continue
+            self.ax.annotate(
+                f'{price:.2f}',
+                xy=(xi, yi),
+                xytext=(0, 10),
+                textcoords='offset points',
+                ha='center',
+                fontsize=8,
+                color=self._theme['text'],
+            )
 
     def _plot_index(self, res: dict, *, title: str, group_by: str) -> None:
         """Рисует линейный график индекса (база=100).
@@ -602,11 +767,41 @@ class AnalyticsWidget(QWidget):
             self.kpi.setText('Нет данных под выбранные фильтры.')
             return
 
-        self.ax.axhline(100, linestyle='--', linewidth=1)
-        self.ax.plot(x.tolist(), y.astype(float).tolist(), marker='o')
+        self.ax.axhline(
+            100, linestyle='--', linewidth=1, color=self._theme['baseline']
+        )
+
+        x_list = x.tolist()
+        y_list = y.astype(float).tolist()
+        gap_threshold = pd.Timedelta(
+            days=_GAP_BREAK_DAYS.get(group_by, 30)
+        )
+
+        # Рисуем линию отдельными сегментами, разрывая её там, где между
+        # соседними покупками прошло больше gap_threshold — иначе
+        # matplotlib честно, но обманчиво интерполирует прямой между
+        # двумя точками, разнесёнными на месяцы, будто там был плавный
+        # тренд. Маркеры рисуем отдельно поверх, на ВСЕХ точках сразу —
+        # разрыв линии не должен прятать сами наблюдения.
+        seg_x, seg_y = [x_list[0]], [y_list[0]]
+        for i in range(1, len(x_list)):
+            if x_list[i] - x_list[i - 1] > gap_threshold:
+                self.ax.plot(
+                    seg_x, seg_y, color=self._theme['line'], linewidth=1.5
+                )
+                seg_x, seg_y = [], []
+            seg_x.append(x_list[i])
+            seg_y.append(y_list[i])
+        self.ax.plot(seg_x, seg_y, color=self._theme['line'], linewidth=1.5)
+
+        self.ax.plot(
+            x_list, y_list,
+            linestyle='none', marker='o', color=self._theme['line'],
+        )
+        self._annotate_prices(dfp, mask, x_list, y_list)
         self.ax.set_title(title, pad=14, fontsize=12, fontweight='bold')
         self.ax.set_ylabel('Индекс')
-        self.ax.grid(True)
+        self.ax.grid(True, color=self._theme['grid'], alpha=0.5)
 
         self._format_xaxis()
 
