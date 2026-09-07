@@ -87,7 +87,18 @@ class MainWindow(QMainWindow):
 
         from app.gui.analytics import AnalyticsWidget
 
-        self.setCentralWidget(AnalyticsWidget())
+        self._analytics = AnalyticsWidget()
+        self.setCentralWidget(self._analytics)
+
+    def closeEvent(self, event) -> None:  # noqa: N802 — Qt naming
+        """Дожидается фонового расчёта аналитики перед закрытием окна.
+
+        Без этого закрытие приложения посреди построения графика может
+        уронить процесс с "QThread: Destroyed while thread is still
+        running" — Qt не прощает удаление объекта из живого потока.
+        """
+        self._analytics.shutdown()
+        super().closeEvent(event)
 
 
 def main() -> None:

@@ -27,6 +27,7 @@ from app.crud import category_crud, product_crud, store_crud
 from app.gui.data_manager import DataManagerDialog
 from app.gui.qt_helpers import setup_searchable_combo
 from app.gui.ref_cache import get_cached
+from app.gui.workers import BackgroundTaskRunner
 from app.service import analytics as svc
 from app.service.crud_service import list_items
 from app.service.purchases import (
@@ -48,6 +49,7 @@ class AnalyticsWidget(QWidget):
 
         self._data_min: Optional[date] = None
         self._data_max: Optional[date] = None
+        self._task_runner = BackgroundTaskRunner()
 
         # --- Верхняя панель (кнопки) ---
         self.btn_data = QPushButton('Данные…')
@@ -280,8 +282,6 @@ class AnalyticsWidget(QWidget):
         self._reload_combos()
         self._init_date_bounds()
 
-    # ------------------- kind switching -------------------
-
     def _on_kind_changed(self) -> None:
         """Реакция на смену типа аналитики.
 
@@ -397,18 +397,17 @@ class AnalyticsWidget(QWidget):
                     to_date=to_date,
                 )
 
-                res = svc.product_inflation_index(
+                self._run_analytics(
+                    svc.product_inflation_index,
+                    on_success=lambda res: self._plot_index(
+                        res, title=title, group_by=group_by,
+                    ),
                     product_id=int(product_id),
                     from_date=from_date,
                     to_date=to_date,
                     group_by=group_by,
                     price_mode=price_mode,
                     promo_mode=promo_mode,
-                )
-                self._plot_index(
-                    res,
-                    title=title,
-                    group_by=group_by,
                 )
                 return
 
@@ -431,18 +430,17 @@ class AnalyticsWidget(QWidget):
                     from_date=from_date,
                     to_date=to_date,
                 )
-                res = svc.category_inflation_index(
+                self._run_analytics(
+                    svc.category_inflation_index,
+                    on_success=lambda res: self._plot_index(
+                        res, title=title, group_by=group_by,
+                    ),
                     category_id=int(category_id),
                     from_date=from_date,
                     to_date=to_date,
                     group_by=group_by,
                     price_mode=price_mode,
                     promo_mode=promo_mode,
-                )
-                self._plot_index(
-                    res,
-                    title=title,
-                    group_by=group_by,
                 )
                 return
 
@@ -465,7 +463,13 @@ class AnalyticsWidget(QWidget):
                     from_date=from_date,
                     to_date=to_date,
                 )
-                res = svc.store_inflation_index(
+                self._run_analytics(
+                    svc.store_inflation_index,
+                    on_success=lambda res: self._plot_index(
+                        res,
+                        title='Индекс по магазину (база=100)',
+                        group_by=group_by,
+                    ),
                     store_id=int(store_id),
                     from_date=from_date,
                     to_date=to_date,
@@ -473,11 +477,6 @@ class AnalyticsWidget(QWidget):
                     group_by=group_by,
                     price_mode=price_mode,
                     promo_mode=promo_mode,
-                )
-                self._plot_index(
-                    res,
-                    title='Индекс по магазину (база=100)',
-                    group_by=group_by,
                 )
                 return
 
@@ -494,6 +493,54 @@ class AnalyticsWidget(QWidget):
             self.kpi.setText('Ошибка при построении.')
             QMessageBox.critical(self, 'Ошибка', str(e))
             return
+
+    def _run_analytics(self, fn, *, on_success, **kwargs) -> None:
+        """Запускает тяжёлый расчёт аналитики в фоне, не блокируя UI.
+
+        Пока расчёт идёт, кнопка "Построить" недоступна — это не
+        только UX (видно, что программа работает, а не зависла), но и
+        защита от гонки: если бы два расчёта одновременно писали в
+        один и тот же self.figure/self.canvas, порядок отрисовки был
+        бы непредсказуем.
+        """
+        self._set_busy(True)
+        started = self._task_runner.run(
+            fn,
+            on_success=on_success,
+            on_error=self._on_build_failed,
+            on_finished=lambda: self._set_busy(False),
+            **kwargs,
+        )
+        if not started:
+            # На практике сюда не попасть, пока кнопка задизейблена,
+            # но не оставляем busy=True навечно, если всё же попали.
+            self._set_busy(False)
+
+    def _on_build_failed(self, message: str) -> None:
+        """Слот failed — вызывается в основном потоке (Qt queued connection).
+
+        Здесь можно безопасно трогать self.canvas/self.kpi, даже
+        несмотря на то, что расчёт упал в фоновом потоке.
+        """
+        self._reset_axes()
+        self.canvas.draw_idle()
+        self.kpi.setText('Ошибка при построении.')
+        QMessageBox.critical(self, 'Ошибка', message)
+
+    def _set_busy(self, busy: bool) -> None:
+        self.btn_build.setEnabled(not busy)
+        self.btn_build.setText('Считаю…' if busy else 'Построить')
+        if busy:
+            self.kpi.setText('Считаю…')
+
+    def shutdown(self) -> None:
+        """Дожидается фонового расчёта перед закрытием окна.
+
+        Вызывается из MainWindow.closeEvent. Без этого можно словить
+        "QThread: Destroyed while thread is still running", если
+        закрыть приложение посреди построения графика.
+        """
+        self._task_runner.shutdown()
 
     def _reset_axes(self) -> None:
         """
