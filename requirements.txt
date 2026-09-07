@@ -16,7 +16,6 @@ guiqwt==4.4.5
 h5py==3.14.0
 idna==3.11
 importlib_resources==6.5.2
--e git+ssh://git@github.com/StigTax/inflation_tracker.git@f898a0fbf25ab3557d383302bd56f787ae2c7c9f#egg=inflation_tracker
 iniconfig==2.1.0
 kiwisolver==1.4.7
 lsprotocol==2025.0.0
