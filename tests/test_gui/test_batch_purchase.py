@@ -12,6 +12,8 @@ quick_add_product() его и берёт.
 from app.crud import product_crud
 from app.gui.tabs.batch_purchase import BatchPurchaseDialog, BatchRowWidget
 from app.gui.tabs.common import set_combo_by_data
+from app.models import Product
+from app.service import crud_service
 from app.service.crud_service import list_items
 from PyQt6.QtWidgets import QDialog
 
@@ -22,6 +24,42 @@ def test_row_values_none_when_empty(qtbot):
     qtbot.addWidget(row)
 
     assert row.values() is None
+
+
+def test_row_width_stays_bounded_with_long_product_name(
+    qtbot, category_food, unit_kg
+):
+    """Регрессия: длинное название продукта раздувало product_combo и
+    выталкивало кнопку удаления строки (✕) за пределы диалога — она
+    "появлялась" только если руками растянуть окно. Корень — дефолтный
+    sizeAdjustPolicy editable-комбобокса, фикс — в setup_searchable_combo()
+    (app/gui/qt_helpers.py), здесь проверяем эффект на реальной строке.
+    """
+    long_name_product = crud_service.create_item(
+        product_crud,
+        Product(
+            name=(
+                'Очень длинное название продукта с уточнением бренда, '
+                'вкуса и объёма упаковки специально для теста на ширину'
+            ),
+            category_id=category_food.id,
+            unit_id=unit_kg.id,
+        ),
+    )
+
+    row = BatchRowWidget()
+    qtbot.addWidget(row)
+    row.reload_products()  # длинное название теперь есть в модели
+
+    set_combo_by_data(row.product_combo, long_name_product.id)
+
+    # Кнопка удаления — фиксированной ширины и не должна ужиматься
+    # или "теряться" из-за соседнего комбобокса.
+    assert row.btn_remove.width() == 28
+    # Комбобокс не обязан вмещать имя целиком — именно это и раздувало
+    # строку раньше; минимальная ширина должна оставаться в разумных
+    # пределах независимо от длины названия.
+    assert row.product_combo.minimumSizeHint().width() < 400
 
 
 def test_row_values_when_filled(qtbot, product_vegetable):

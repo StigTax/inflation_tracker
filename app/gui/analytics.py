@@ -121,10 +121,18 @@ class AnalyticsWidget(QWidget):
         self.btn_data.clicked.connect(self.open_data_manager)
         self.btn_build.clicked.connect(self.build)
 
+        # "Построить" переехала в левую панель, под фильтры (см. ниже) —
+        # основное действие должно быть рядом с параметрами, которые на
+        # него влияют, а не оторвано от них наверху экрана.
+        build_font = self.btn_build.font()
+        build_font.setPointSize(build_font.pointSize() + 2)
+        build_font.setBold(True)
+        self.btn_build.setFont(build_font)
+        self.btn_build.setMinimumHeight(44)
+
         top = QHBoxLayout()
         top.addWidget(self.btn_data)
         top.addStretch(1)
-        top.addWidget(self.btn_build)
 
         # --- Левая панель параметров ---
         self.kind_combo = QComboBox()
@@ -198,8 +206,14 @@ class AnalyticsWidget(QWidget):
         left_form.addRow('Режим цены:', self.price_mode)
         left_form.addRow('Акции:', self.promo_mode)
 
+        left_layout = QVBoxLayout()
+        left_layout.addLayout(left_form)
+        left_layout.addSpacing(16)
+        left_layout.addWidget(self.btn_build)
+        left_layout.addStretch(1)
+
         left = QWidget()
-        left.setLayout(left_form)
+        left.setLayout(left_layout)
         left.setSizePolicy(
             QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding
         )

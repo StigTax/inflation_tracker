@@ -380,3 +380,11 @@ def test_store_index_plot_title_uses_real_title_not_hardcoded_string(
     )
     assert few_stores[0].name in analytics_widget.ax.get_title()
 
+
+def test_build_button_is_enlarged_and_bold(analytics_widget):
+    """Кнопка «Построить» должна бросаться в глаза — крупнее и жирнее
+    дефолтной, раз она теперь главное действие в левой панели, а не
+    одна из двух кнопок в верхней строке."""
+    assert analytics_widget.btn_build.minimumHeight() >= 44
+    assert analytics_widget.btn_build.font().bold() is True
+
