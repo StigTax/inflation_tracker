@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import logging
 from datetime import date
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from sqlalchemy import func, select
 
 from app.core.db import get_session
+from app.core.sentinels import UNSET, UnsetType
 from app.crud import product_crud, store_crud
+from app.crud.base import CLEAR
 from app.crud.purchases import crud as purchase_crud
 from app.logging import logged
 from app.models import Product, Purchase
@@ -201,11 +203,11 @@ def update_purchase(
     product_id: Optional[int] = None,
     total_price: Optional[float] = None,
     quantity: Optional[float] = None,
-    comment: Optional[str] = None,
+    comment: Union[Optional[str], UnsetType] = UNSET,
     purchase_date: Optional[date] = None,
     is_promo: Optional[bool] = None,
-    promo_type: Optional[str] = None,
-    regular_unit_price: Optional[float] = None,
+    promo_type: Union[Optional[str], UnsetType] = UNSET,
+    regular_unit_price: Union[Optional[float], UnsetType] = UNSET,
 ) -> Purchase:
     """Обновить покупку с поддержкой частичного обновления и промо-логики.
 
@@ -217,8 +219,9 @@ def update_purchase(
     Промо-правила:
     - если `is_promo=False`, то `promo_type` и `regular_unit_price`
       сбрасываются в None;
-    - если передан `promo_type` или `regular_unit_price`, `is_promo`
-      принудительно True.
+    - явное значение `promo_type`/`regular_unit_price` включает промо;
+    - для nullable-полей явный `None` означает очистить значение, а
+      `UNSET` (значение по умолчанию) — не менять его при partial update.
 
     Коммит выполняется вручную (commit=False внутри CRUD), чтобы корректно
     применить промо-правила до фиксации транзакции.
@@ -229,11 +232,11 @@ def update_purchase(
         product_id: Новый ID продукта.
         total_price: Новая итоговая стоимость.
         quantity: Новое количество.
-        comment: Новый комментарий.
+        comment: Новый комментарий; None — очистить, UNSET — не менять.
         purchase_date: Новая дата покупки.
         is_promo: Явно включить/выключить промо.
-        promo_type: Тип акции/описание.
-        regular_unit_price: Обычная цена за единицу.
+        promo_type: Тип акции; None — очистить, UNSET — не менять.
+        regular_unit_price: Обычная цена; None — очистить, UNSET — не менять.
 
     Returns:
         Purchase: Обновлённая покупка (со связями).
@@ -248,7 +251,7 @@ def update_purchase(
         quantity = validate_positive_value(quantity, 'Количество товара')
     if purchase_date is not None:
         purchase_date = validate_date_not_in_future(purchase_date)
-    if regular_unit_price is not None:
+    if regular_unit_price is not UNSET and regular_unit_price is not None:
         regular_unit_price = validate_positive_value(
             regular_unit_price, 'Обычная цена за единицу'
         )
@@ -258,22 +261,27 @@ def update_purchase(
             product_crud.get_or_raise(db=db, obj_id=product_id)
         if store_id is not None:
             store_crud.get_or_raise(db=db, obj_id=store_id)
+        update_fields = {
+            'store_id': store_id,
+            'product_id': product_id,
+            'total_price': total_price,
+            'quantity': quantity,
+            'purchase_date': purchase_date,
+        }
+        if comment is not UNSET:
+            update_fields['comment'] = CLEAR if comment is None else comment
+
         purchase = purchase_crud.update(
             db=db,
             obj_id=purchase_id,
             commit=False,
-            store_id=store_id,
-            product_id=product_id,
-            total_price=total_price,
-            quantity=quantity,
-            comment=comment,
-            purchase_date=purchase_date,
+            **update_fields,
         )
 
         if (
             is_promo is not None
-            or promo_type is not None
-            or regular_unit_price is not None
+            or promo_type is not UNSET
+            or regular_unit_price is not UNSET
         ):
             (
                 purchase.is_promo,

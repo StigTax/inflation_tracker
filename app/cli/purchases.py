@@ -94,18 +94,27 @@ def _update(args: argparse.Namespace) -> Purchase:
     elif args.no_promo:
         is_promo = False
 
-    return update_purchase(
-        purchase_id=args.id,
-        store_id=args.store_id,
-        product_id=args.product_id,
-        total_price=args.total_price,
-        quantity=args.quantity,
-        comment=args.comment,
-        purchase_date=args.date,
-        is_promo=is_promo,
-        promo_type=args.promo_type,
-        regular_unit_price=args.regular_unit_price,
-    )
+    update_kwargs = {
+        'purchase_id': args.id,
+        'store_id': args.store_id,
+        'product_id': args.product_id,
+        'total_price': args.total_price,
+        'quantity': args.quantity,
+        'purchase_date': args.date,
+        'is_promo': is_promo,
+    }
+
+    # Для nullable-полей None теперь означает явное очищение. argparse
+    # также использует None как default для НЕпереданного аргумента,
+    # поэтому такие ключи добавляем только при реальном значении.
+    if args.comment is not None:
+        update_kwargs['comment'] = args.comment
+    if args.promo_type is not None:
+        update_kwargs['promo_type'] = args.promo_type
+    if args.regular_unit_price is not None:
+        update_kwargs['regular_unit_price'] = args.regular_unit_price
+
+    return update_purchase(**update_kwargs)
 
 
 def _list(args: argparse.Namespace) -> list[Purchase]:

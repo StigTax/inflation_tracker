@@ -218,9 +218,13 @@ class PurchaseCRUD(CRUDBase[Purchase]):
             is_promo=is_promo,
         )
 
-        stmt = stmt.order_by(
+        primary_order = (
             order_by if order_by is not None else Purchase.purchase_date
         )
+        # purchase_date не уникальна: несколько строк одного чека имеют
+        # одинаковую дату. Вторичный ключ делает offset/limit пагинацию
+        # детерминированной и не даёт строкам "прыгать" между страницами.
+        stmt = stmt.order_by(primary_order, Purchase.id.asc())
 
         if offset is not None:
             stmt = stmt.offset(offset)

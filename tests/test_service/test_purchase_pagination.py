@@ -130,3 +130,28 @@ def test_count_filtered_zero_for_non_matching_filter(
     other_store = few_stores[1]
     total = purchases.count_purchases_filtered(store_id=other_store.id)
     assert total == 0
+
+
+def test_same_date_records_have_stable_id_tiebreaker(
+    product_vegetable, single_store
+):
+    same_date = date(2024, 2, 1)
+    created = [
+        purchases.create_purchase(
+            store_id=single_store.id,
+            product_id=product_vegetable.id,
+            quantity=1.0,
+            price=100.0 + i,
+            purchase_date=same_date,
+        )
+        for i in range(6)
+    ]
+
+    result = purchases.list_purchases_filtered(
+        store_id=single_store.id,
+        order_by=Purchase.purchase_date.asc(),
+        offset=0,
+        limit=6,
+    )
+
+    assert [p.id for p in result] == sorted(p.id for p in created)

@@ -43,3 +43,48 @@ def test_update_rejects_regular_price_together_with_no_promo():
 
     with pytest.raises(ValueError, match='--no-promo'):
         _update(args)
+
+
+def test_update_omitted_nullable_fields_are_not_forwarded(monkeypatch):
+    captured = {}
+
+    def fake_update_purchase(**kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(
+        'app.cli.purchases.update_purchase',
+        fake_update_purchase,
+    )
+
+    _update(_fake_update_args(total_price=120.0))
+
+    assert captured['total_price'] == 120.0
+    assert 'comment' not in captured
+    assert 'promo_type' not in captured
+    assert 'regular_unit_price' not in captured
+
+
+def test_update_forwards_nullable_fields_when_value_is_provided(monkeypatch):
+    captured = {}
+
+    def fake_update_purchase(**kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(
+        'app.cli.purchases.update_purchase',
+        fake_update_purchase,
+    )
+
+    _update(
+        _fake_update_args(
+            comment='Комментарий',
+            promo_type='discount',
+            regular_unit_price=150.0,
+        )
+    )
+
+    assert captured['comment'] == 'Комментарий'
+    assert captured['promo_type'] == 'discount'
+    assert captured['regular_unit_price'] == 150.0

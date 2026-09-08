@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Union
 
 from sqlalchemy import (
     Boolean,
@@ -19,6 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, validates
 
 from app.core.db import Base
+from app.core.sentinels import UNSET, UnsetType
 
 
 class Purchase(Base):
@@ -115,21 +116,18 @@ class Purchase(Base):
     def resolve_promo(
         *,
         is_promo: Optional[bool],
-        promo_type: Optional[str],
-        regular_unit_price: Optional[Decimal],
+        promo_type: Union[Optional[str], UnsetType],
+        regular_unit_price: Union[Optional[Decimal], UnsetType],
         current_is_promo: bool,
         current_promo_type: Optional[str],
         current_regular_unit_price: Optional[Decimal],
     ) -> tuple[bool, Optional[str], Optional[Decimal]]:
         """Свести промо-поля к согласованному триплету.
 
-        Единое правило (раньше было продублировано в create_purchase,
-        update_purchase и валидаторе модели):
-        - is_promo=False сбрасывает promo_type/regular_unit_price;
-        - явные promo_type/regular_unit_price включают is_promo, даже
-          поверх is_promo=False в этом же вызове;
-        - непереданные (None) параметры не трогают текущее значение —
-          именно поэтому нужны current_* (для partial-update).
+        `UNSET` означает partial update: поле не передано и текущее
+        значение нужно сохранить. Явный `None`, напротив, очищает
+        nullable-поле. Это позволяет отличить "не трогать" от
+        "пользователь очистил тип акции/обычную цену".
         """
         result_is_promo = current_is_promo
         result_promo_type = current_promo_type
@@ -141,13 +139,15 @@ class Purchase(Base):
                 result_promo_type = None
                 result_price = None
 
-        if promo_type is not None:
+        if promo_type is not UNSET:
             result_promo_type = promo_type
-            result_is_promo = True
+            if promo_type is not None:
+                result_is_promo = True
 
-        if regular_unit_price is not None:
+        if regular_unit_price is not UNSET:
             result_price = regular_unit_price
-            result_is_promo = True
+            if regular_unit_price is not None:
+                result_is_promo = True
 
         return result_is_promo, result_promo_type, result_price
 

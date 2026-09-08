@@ -191,6 +191,22 @@ def create_item(
             'Тип единицы измерения'
         )
 
+    if (
+        hasattr(obj_in, 'unit')
+        and isinstance(obj_in.unit, str)
+        and _column_unique(obj_in.__class__, 'unit')
+    ):
+        with get_session() as session:
+            exists = crud.exists_by_name_ci(
+                db=session,
+                field='unit',
+                name=obj_in.unit,
+            )
+            if exists:
+                raise ValueError(
+                    f"Единица измерения '{obj_in.unit}' уже существует."
+                )
+
     with get_session() as session:
         _validate_foreign_keys(session, obj_in)
         item = crud.create(
@@ -266,6 +282,20 @@ def update_item(
             fields['unit'],
             'Единица измерения'
         )
+
+        if _column_unique(crud.model, 'unit'):
+            with get_session() as session:
+                exists = crud.exists_by_name_ci(
+                    db=session,
+                    field='unit',
+                    name=fields['unit'],
+                    exclude_id=item_id,
+                )
+                if exists:
+                    raise ValueError(
+                        f"Единица измерения '{fields['unit']}' "
+                        'уже существует.'
+                    )
 
     if 'measure_type' in fields and fields['measure_type'] is not None:
         fields['measure_type'] = validate_non_empty_str(

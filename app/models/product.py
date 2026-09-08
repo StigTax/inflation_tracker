@@ -69,6 +69,7 @@ class Unit(Base):
     unit = Column(
         String(25),
         nullable=False,
+        unique=True,
         comment='Единица измерения',
     )
 

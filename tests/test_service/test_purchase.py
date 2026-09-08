@@ -217,3 +217,65 @@ def test_list_purchases_filter_by_promo(
     assert len(all_items) == len(promo_items) + len(non_promo_items)
     assert all(p.is_promo for p in promo_items)
     assert all(not p.is_promo for p in non_promo_items)
+
+
+def test_update_purchase_explicit_none_clears_comment(purchase_product):
+    purchases.update_purchase(
+        purchase_id=purchase_product.id,
+        comment='Временный комментарий',
+    )
+
+    updated = purchases.update_purchase(
+        purchase_id=purchase_product.id,
+        comment=None,
+    )
+
+    assert updated.comment is None
+
+
+def test_update_purchase_omitted_comment_keeps_existing(purchase_product):
+    purchases.update_purchase(
+        purchase_id=purchase_product.id,
+        comment='Не трогать',
+    )
+
+    updated = purchases.update_purchase(
+        purchase_id=purchase_product.id,
+        total_price=145.0,
+    )
+
+    assert updated.comment == 'Не трогать'
+
+
+def test_update_purchase_explicit_none_clears_promo_type(
+    few_purchase_in_single_store,
+):
+    promo_purchase = few_purchase_in_single_store[1]
+    assert promo_purchase.is_promo is True
+    assert promo_purchase.promo_type is not None
+
+    updated = purchases.update_purchase(
+        purchase_id=promo_purchase.id,
+        is_promo=True,
+        promo_type=None,
+    )
+
+    assert updated.is_promo is True
+    assert updated.promo_type is None
+
+
+def test_update_purchase_omitted_promo_fields_keep_existing(
+    few_purchase_in_single_store,
+):
+    promo_purchase = few_purchase_in_single_store[1]
+    old_type = promo_purchase.promo_type
+    old_regular_price = promo_purchase.regular_unit_price
+
+    updated = purchases.update_purchase(
+        purchase_id=promo_purchase.id,
+        quantity=2.5,
+    )
+
+    assert updated.is_promo is True
+    assert updated.promo_type == old_type
+    assert updated.regular_unit_price == old_regular_price

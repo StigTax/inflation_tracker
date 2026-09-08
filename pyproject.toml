@@ -1,6 +1,6 @@
 [project]
 name = "inflation_tracker"
-version = "0.5.0"
+version = "0.4.5"
 description = "Трекер для отслеживания инляции"
 readme = "README.md"
 classifiers = ["Programming Language :: Python :: 3.9"]
