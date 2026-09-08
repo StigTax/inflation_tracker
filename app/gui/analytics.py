@@ -176,6 +176,11 @@ class AnalyticsWidget(QWidget):
         self.promo_mode.addItem('Без акций', 'exclude')
         self.promo_mode.addItem('Только акции', 'only')
 
+        self.index_method_combo = QComboBox()
+        self.index_method_combo.addItem('Ласпейрес', 'laspeyres')
+        self.index_method_combo.addItem('Пааше', 'paasche')
+        self.index_method_combo.addItem('Фишер', 'fisher')
+
         self.kind_combo.currentIndexChanged.connect(self._on_kind_changed)
 
         left_form = QFormLayout()
@@ -184,6 +189,7 @@ class AnalyticsWidget(QWidget):
         left_form.addRow('Категория:', self.category_combo)
         left_form.addRow('Магазин:', self.store_combo)
         left_form.addRow('Корзина (ID прод.):', self.product_ids_edit)
+        left_form.addRow('Метод индекса:', self.index_method_combo)
 
         left_form.addRow('', self.use_dates)
         left_form.addRow('с:', self.date_from)
@@ -368,11 +374,16 @@ class AnalyticsWidget(QWidget):
         need_product = kind == 'product_index'
         need_category = kind == 'category_index'
         need_store = kind == 'store_index'
+        # Метод индекса (Ласпейрес/Пааше/Фишер) имеет смысл только там,
+        # где в корзине больше одного товара — у product_index веса не
+        # на чем считать, там все три метода дают одно и то же число.
+        need_index_method = need_category or need_store
 
         self.product_combo.setEnabled(need_product)
         self.category_combo.setEnabled(need_category)
         self.store_combo.setEnabled(need_store)
         self.product_ids_edit.setEnabled(need_store)
+        self.index_method_combo.setEnabled(need_index_method)
 
         if not need_product:
             self.product_combo.setCurrentIndex(0)
@@ -381,6 +392,8 @@ class AnalyticsWidget(QWidget):
         if not need_store:
             self.store_combo.setCurrentIndex(0)
             self.product_ids_edit.clear()
+        if not need_index_method:
+            self.index_method_combo.setCurrentIndex(0)
 
         self._toggle_dates()
 
@@ -479,6 +492,7 @@ class AnalyticsWidget(QWidget):
         group_by = self.group_combo.currentData() or 'month'
         price_mode = self.price_mode.currentData() or 'paid'
         promo_mode = self.promo_mode.currentData() or 'include'
+        index_method = self.index_method_combo.currentData() or 'laspeyres'
 
         product_ids = None
         if kind == 'store_index':
@@ -541,6 +555,7 @@ class AnalyticsWidget(QWidget):
                     promo_mode=promo_mode,
                     from_date=from_date,
                     to_date=to_date,
+                    index_method=index_method,
                 )
                 self._run_analytics(
                     svc.category_inflation_index,
@@ -553,6 +568,7 @@ class AnalyticsWidget(QWidget):
                     group_by=group_by,
                     price_mode=price_mode,
                     promo_mode=promo_mode,
+                    index_method=index_method,
                 )
                 return
 
@@ -574,12 +590,13 @@ class AnalyticsWidget(QWidget):
                     promo_mode=promo_mode,
                     from_date=from_date,
                     to_date=to_date,
+                    index_method=index_method,
                 )
                 self._run_analytics(
                     svc.store_inflation_index,
                     on_success=lambda res: self._plot_index(
                         res,
-                        title='Индекс по магазину (база=100)',
+                        title=title,
                         group_by=group_by,
                     ),
                     store_id=int(store_id),
@@ -589,6 +606,7 @@ class AnalyticsWidget(QWidget):
                     group_by=group_by,
                     price_mode=price_mode,
                     promo_mode=promo_mode,
+                    index_method=index_method,
                 )
                 return
 
@@ -858,6 +876,7 @@ class AnalyticsWidget(QWidget):
         promo_mode: str,
         from_date: Optional[date],
         to_date: Optional[date],
+        index_method: Optional[str] = None,
     ) -> str:
         kind_map = {
             'product_index': 'Индекс цен по продукту',
@@ -879,8 +898,15 @@ class AnalyticsWidget(QWidget):
             'exclude': 'без акций',
             'only': 'только акции',
         }
+        method_map = {
+            'laspeyres': 'Ласпейрес',
+            'paasche': 'Пааше',
+            'fisher': 'Фишер',
+        }
 
         line1 = f'{kind_map.get(kind, "Индекс")} — {obj_name}'
+        if index_method:
+            line1 += f' ({method_map.get(index_method, index_method)})'
         line2 = (
             f'Период: {group_map.get(group_by, group_by)} • '
             f'{price_map.get(price_mode, price_mode)} • '

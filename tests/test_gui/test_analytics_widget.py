@@ -14,9 +14,11 @@ app.gui.analytics).
 """
 
 import threading
+from datetime import date
 
 import pytest
 from app.gui.analytics import AnalyticsWidget
+from app.service import purchases
 
 
 @pytest.fixture
@@ -32,6 +34,15 @@ def _select_product(widget: AnalyticsWidget, product_id: int) -> None:
     )
     widget.product_combo.setCurrentIndex(
         widget.product_combo.findData(product_id)
+    )
+
+
+def _select_category(widget: AnalyticsWidget, category_id: int) -> None:
+    widget.kind_combo.setCurrentIndex(
+        widget.kind_combo.findData('category_index')
+    )
+    widget.category_combo.setCurrentIndex(
+        widget.category_combo.findData(category_id)
     )
 
 
@@ -156,15 +167,14 @@ def test_shutdown_waits_for_background_calculation(
     assert analytics_widget._task_runner.is_running() is False
 
 
+# ---------- регрессия: product_ids_edit для store_index ----------
+# (AttributeError: 'AnalyticsWidget' object has no attribute
+# 'product_ids_edit' — виджет был проброшен в _parse_ids()/build(), но
+# никогда не создавался и не клался в форму)
+
 def test_store_index_builds_without_basket_filter(
     qtbot, analytics_widget, few_stores, monkeypatch
 ):
-    """Регрессия на AttributeError из-за отсутствующего product_ids_edit.
-
-    Раньше это падало на ЛЮБОМ построении по магазину, ещё до похода в
-    сервис — поэтому здесь достаточно заглушки store_inflation_index,
-    сам факт, что до неё дошло исполнение, уже и есть проверка бага.
-    """
     calls = []
 
     def fake_store_index(**kwargs):
@@ -190,7 +200,6 @@ def test_store_index_builds_without_basket_filter(
 def test_store_index_builds_with_basket_filter(
     qtbot, analytics_widget, few_stores, monkeypatch
 ):
-    """Значение из product_ids_edit доезжает до сервиса как list[int]."""
     calls = []
 
     def fake_store_index(**kwargs):
@@ -216,12 +225,6 @@ def test_store_index_builds_with_basket_filter(
 def test_store_index_invalid_basket_shows_information_and_skips_service(
     analytics_widget, few_stores, monkeypatch, information_calls
 ):
-    """Мусор в корзине — мягкий QMessageBox, а не traceback наружу.
-
-    Отдельно проверяем, что store_inflation_index вообще не вызывается:
-    ValueError из _parse_ids() должен обрываться в build() ДО ухода в
-    фон, а не долетать до сервиса и не тонуть в общем except Exception.
-    """
     def fail_if_called(**kwargs):
         raise AssertionError('store_inflation_index не должен вызываться')
 
@@ -234,7 +237,146 @@ def test_store_index_invalid_basket_shows_information_and_skips_service(
 
     analytics_widget.build()
 
-    assert information_calls, (
-        'ожидали QMessageBox.information на невалидный id'
-    )
+    assert information_calls, 'ожидали information на невалидный id'
     assert analytics_widget.btn_build.isEnabled() is True
+
+
+# ---------- index_method: Ласпейрес/Пааше/Фишер ----------
+
+def test_index_method_combo_enabled_only_for_category_and_store(
+    analytics_widget, product_vegetable, category_food, few_stores,
+):
+    """Метод индекса имеет смысл только там, где в корзине > 1 товара."""
+    _select_product(analytics_widget, product_vegetable.id)
+    assert analytics_widget.index_method_combo.isEnabled() is False
+
+    _select_category(analytics_widget, category_food.id)
+    assert analytics_widget.index_method_combo.isEnabled() is True
+
+    _select_store(analytics_widget, few_stores[0].id)
+    assert analytics_widget.index_method_combo.isEnabled() is True
+
+
+def test_index_method_resets_to_laspeyres_when_switching_to_product(
+    analytics_widget, product_vegetable, category_food,
+):
+    _select_category(analytics_widget, category_food.id)
+    analytics_widget.index_method_combo.setCurrentIndex(
+        analytics_widget.index_method_combo.findData('fisher')
+    )
+    assert analytics_widget.index_method_combo.currentData() == 'fisher'
+
+    _select_product(analytics_widget, product_vegetable.id)
+
+    assert analytics_widget.index_method_combo.currentData() == 'laspeyres'
+
+
+def test_category_index_passes_selected_index_method_to_service(
+    qtbot, analytics_widget, category_food, monkeypatch
+):
+    calls = []
+
+    def fake_category_index(**kwargs):
+        calls.append(kwargs)
+        return {'points': [], 'kpi': None}
+
+    monkeypatch.setattr(
+        'app.service.analytics.category_inflation_index',
+        fake_category_index,
+    )
+
+    _select_category(analytics_widget, category_food.id)
+    analytics_widget.index_method_combo.setCurrentIndex(
+        analytics_widget.index_method_combo.findData('paasche')
+    )
+
+    analytics_widget.build()
+
+    qtbot.waitUntil(
+        lambda: analytics_widget.btn_build.isEnabled(), timeout=2000
+    )
+    assert len(calls) == 1
+    assert calls[0]['index_method'] == 'paasche'
+
+
+def test_store_index_passes_selected_index_method_to_service(
+    qtbot, analytics_widget, few_stores, monkeypatch
+):
+    calls = []
+
+    def fake_store_index(**kwargs):
+        calls.append(kwargs)
+        return {'points': [], 'kpi': None}
+
+    monkeypatch.setattr(
+        'app.service.analytics.store_inflation_index', fake_store_index
+    )
+
+    _select_store(analytics_widget, few_stores[0].id)
+    analytics_widget.index_method_combo.setCurrentIndex(
+        analytics_widget.index_method_combo.findData('fisher')
+    )
+
+    analytics_widget.build()
+
+    qtbot.waitUntil(
+        lambda: analytics_widget.btn_build.isEnabled(), timeout=2000
+    )
+    assert len(calls) == 1
+    assert calls[0]['index_method'] == 'fisher'
+
+
+def test_product_index_does_not_pass_index_method_to_service(
+    qtbot, analytics_widget, product_vegetable, monkeypatch
+):
+    """product_inflation_index не принимает index_method — и не должен.
+
+    У одного товара взвешивать нечем: Ласпейрес/Пааше/Фишер дают одно и
+    то же число, так что параметр там был бы декоративным.
+    """
+    calls = []
+
+    def fake_product_index(**kwargs):
+        calls.append(kwargs)
+        return {'points': [], 'kpi': None}
+
+    monkeypatch.setattr(
+        'app.service.analytics.product_inflation_index', fake_product_index
+    )
+
+    _select_product(analytics_widget, product_vegetable.id)
+    analytics_widget.build()
+
+    qtbot.waitUntil(
+        lambda: analytics_widget.btn_build.isEnabled(), timeout=2000
+    )
+    assert len(calls) == 1
+    assert 'index_method' not in calls[0]
+
+
+def test_store_index_plot_title_uses_real_title_not_hardcoded_string(
+    qtbot, analytics_widget, few_stores, product_vegetable,
+):
+    """Регрессия: title считался через _build_plot_title(), но в
+    _plot_index() подставлялась захардкоженная строка 'Индекс по
+    магазину (база=100)', а не он. Из-за этого название магазина и
+    выбранный метод индекса никогда не попадали в заголовок графика.
+
+    Нужна хотя бы одна реальная покупка: при пустом результате
+    _plot_index() выходит раньше set_title(), и тест ничего бы не
+    проверял, падая по не той причине.
+    """
+    purchases.create_purchase(
+        store_id=few_stores[0].id, product_id=product_vegetable.id,
+        quantity=1.0, price=100.0, purchase_date=date(2024, 1, 10),
+    )
+
+    _select_store(analytics_widget, few_stores[0].id)
+
+    analytics_widget.build()
+
+    qtbot.waitUntil(
+        lambda: analytics_widget.btn_build.isEnabled(), timeout=2000
+    )
+    assert few_stores[0].name in analytics_widget.ax.get_title()
+
