@@ -39,7 +39,7 @@ class _StubBatchDialog:
 
 
 def test_on_batch_add_creates_purchases_and_reloads(
-    qtbot, monkeypatch, single_store, product_vegetable
+    qtbot, monkeypatch, single_store, product_vegetable, information_calls
 ):
     tab = PurchasesTab()
     qtbot.addWidget(tab)
@@ -61,6 +61,7 @@ def test_on_batch_add_creates_purchases_and_reloads(
     tab.on_batch_add()
 
     assert tab._total == 1
+    assert information_calls, 'ожидали "Готово" после успешного сохранения'
 
 
 def test_on_batch_add_cancelled_creates_nothing(

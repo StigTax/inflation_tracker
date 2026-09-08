@@ -306,21 +306,96 @@ def _prepare_df_for_index(
     return df
 
 
-def _laspeyres_index(
-    df: pd.DataFrame,
-    *,
+IndexMethod = Literal['laspeyres', 'paasche', 'fisher']
+
+
+def _ensure_index_method(index_method: str) -> IndexMethod:
+    """Провалидировать метод расчёта индекса цен.
+
+    Args:
+        index_method: 'laspeyres' (веса — количества базового периода),
+            'paasche' (веса — количества текущего периода) или
+            'fisher' (геометрическое среднее первых двух).
+
+    Returns:
+        IndexMethod: Валидированное значение.
+
+    Raises:
+        ValueError: Если метод не входит в допустимый набор.
+    """
+    if index_method not in {'laspeyres', 'paasche', 'fisher'}:
+        raise ValueError(
+            'index_method должен быть одним из: laspeyres, paasche, fisher'
+        )
+    return index_method  # type: ignore[return-value]
+
+
+def _empty_price_index_result(
     base_period: Optional[pd.Timestamp] = None,
 ) -> dict[str, Any]:
-    """Посчитать индекс Ласпейреса по корзине товаров.
+    """Пустая структура результата при недостатке данных.
 
-    Весами выступают затраты базового периода (p0 * q0).
-    Если в текущем периоде нет части товаров, индекс считается по пересечению
-    доступных товаров и возвращается coverage (доля покрытого веса базы).
+    Общая для всех трёх методов — раньше была продублирована три раза
+    внутри _laspeyres_index на каждый ранний return.
+    """
+    return {
+        'points': [],
+        'kpi': {
+            'base_period': (
+                str(base_period.date()) if base_period is not None else None
+            ),
+            'last_period': None,
+            'periods': 0,
+            'items_in_base': 0,
+            'items_total_base_weight': 0,
+            'coverage_last': 0.0,
+            'index_last': None,
+            'inflation_total': None,
+            'index_last_laspeyres': None,
+            'index_last_paasche': None,
+            'index_last_fisher': None,
+        },
+    }
+
+
+def _compute_price_index(
+    df: pd.DataFrame,
+    *,
+    method: IndexMethod = 'laspeyres',
+    base_period: Optional[pd.Timestamp] = None,
+) -> dict[str, Any]:
+    """Посчитать индекс цен по корзине товаров: Ласпейрес/Пааше/Фишер.
+
+    Три метода отличаются только тем, чьими количествами взвешивать
+    цены при сравнении с базовым периодом:
+    - Ласпейрес: количествами БАЗОВОГО периода (index = 100 * Σp_t*q0 / Σp0*q0);
+    - Пааше: количествами ТЕКУЩЕГО периода (index = 100 * Σp_t*qt / Σp0*qt);
+    - Фишер: их геометрическое среднее (sqrt(Ласпейрес * Пааше)).
+
+    Поэтому вместо трёх почти одинаковых функций считаем один общий
+    join (period, product) с базовым периодом и достаём из него все три
+    формулы разом — гарантированно на одном и том же пересечении
+    товаров (coverage), иначе сравнение методик было бы нечестным: у
+    каждого метода могла бы получиться своя выборка "выживших" товаров.
+
+    Если в текущем периоде нет части товаров из базы, индекс считается
+    по пересечению доступных товаров; coverage — доля покрытого веса
+    базы (по базовым тратам p0*q0 — одна и та же метрика для всех трёх
+    методов, это про полноту данных, а не про формулу индекса).
+
+    Каждая точка содержит index_laspeyres/index_paasche/index_fisher
+    ОДНОВРЕМЕННО, не только выбранный method — специально для "сверки
+    методик" на одних и тех же данных. `index`/`index_last` — просто
+    алиас на значение выбранного method, ради обратной совместимости
+    вызовов без явного метода.
 
     Args:
         df: Подготовленный датафрейм (с period, product_id, quantity, spend).
-        base_period: Базовый период; если None — берётся минимальный период в
-        df.
+        method: Какое значение положить в index/index_last/inflation_total
+            (остальные два всё равно считаются и возвращаются под своими
+            именами).
+        base_period: Базовый период; если None — берётся минимальный
+            период в df.
 
     Returns:
         dict[str, Any]: Структура вида:
@@ -328,6 +403,9 @@ def _laspeyres_index(
               "points": [{
                     "period": "...",
                     "index": 123.4,
+                    "index_laspeyres": 123.4,
+                    "index_paasche": 121.9,
+                    "index_fisher": 122.6,
                     "coverage": 0.9,
                     "items": 12}, ...
               ],
@@ -335,19 +413,7 @@ def _laspeyres_index(
             }
     """
     if df.empty:
-        return {
-            'points': [],
-            'kpi': {
-                'base_period': None,
-                'last_period': None,
-                'periods': 0,
-                'items_in_base': 0,
-                'items_total_base_weight': 0,
-                'coverage_last': 0.0,
-                'index_last': None,
-                'inflation_total': None,
-            },
-        }
+        return _empty_price_index_result()
 
     df = df.copy()
     df['period'] = pd.to_datetime(df['period'])
@@ -359,19 +425,7 @@ def _laspeyres_index(
     # base weights: spend in base period per product (p0*q0)
     base_slice = df[df['period'] == base_p]
     if base_slice.empty:
-        return {
-            'points': [],
-            'kpi': {
-                'base_period': str(base_p.date()),
-                'last_period': None,
-                'periods': 0,
-                'items_in_base': 0,
-                'items_total_base_weight': 0,
-                'coverage_last': 0.0,
-                'index_last': None,
-                'inflation_total': None,
-            },
-        }
+        return _empty_price_index_result(base_p)
 
     base_agg = (
         base_slice.groupby('product_id', as_index=False)
@@ -384,19 +438,7 @@ def _laspeyres_index(
     base_agg['base_weight'] = base_agg['base_spend']  # p0*q0
 
     if base_agg.empty:
-        return {
-            'points': [],
-            'kpi': {
-                'base_period': str(base_p.date()),
-                'last_period': None,
-                'periods': 0,
-                'items_in_base': 0,
-                'items_total_base_weight': 0,
-                'coverage_last': 0.0,
-                'index_last': None,
-                'inflation_total': None,
-            },
-        }
+        return _empty_price_index_result(base_p)
 
     total_base_weight = float(base_agg['base_weight'].sum())
 
@@ -415,27 +457,42 @@ def _laspeyres_index(
             'base_weight'
         ]], on='product_id', how='inner')
     merged = merged[(merged['base_price'] > 0) & (merged['price'] > 0)]
+
+    # Ласпейрес: p_t*q0 (веса — базовые количества, зашиты в base_weight=p0*q0)
     merged['ratio'] = merged['price'] / merged['base_price']
-    merged['w_ratio'] = merged['base_weight'] * merged['ratio']
+    merged['laspeyres_num'] = merged['base_weight'] * merged['ratio']
+    # Пааше: знаменатель p0*qt (числитель — это просто spend = p_t*qt)
+    merged['paasche_den'] = merged['base_price'] * merged['qty']
 
     idx = (
         merged.groupby('period', as_index=False)
         .agg(
-            sum_w_ratio=('w_ratio', 'sum'),
+            laspeyres_num=('laspeyres_num', 'sum'),
             sum_w=('base_weight', 'sum'),
-            items=('product_id', 'nunique')
+            paasche_num=('spend', 'sum'),
+            paasche_den=('paasche_den', 'sum'),
+            items=('product_id', 'nunique'),
         )
         .copy()
     )
-    idx['index'] = 100.0 * idx['sum_w_ratio'] / idx['sum_w']
+    idx['index_laspeyres'] = 100.0 * idx['laspeyres_num'] / idx['sum_w']
+    idx['index_paasche'] = 100.0 * idx['paasche_num'] / idx['paasche_den']
+    idx['index_fisher'] = (
+        idx['index_laspeyres'] * idx['index_paasche']
+    ) ** 0.5
     idx['coverage'] = idx['sum_w'] / total_base_weight
 
     idx = idx.sort_values('period')
 
+    method_col = f'index_{method}'
+
     points = [
         {
             'period': str(pd.Timestamp(row['period']).date()),
-            'index': float(row['index']),
+            'index': float(row[method_col]),
+            'index_laspeyres': float(row['index_laspeyres']),
+            'index_paasche': float(row['index_paasche']),
+            'index_fisher': float(row['index_fisher']),
             'coverage': float(row['coverage']),
             'items': int(row['items']),
         }
@@ -450,11 +507,52 @@ def _laspeyres_index(
         'items_in_base': int(base_agg.shape[0]),
         'items_total_base_weight': float(total_base_weight),
         'coverage_last': float(last['coverage']),
-        'index_last': float(last['index']),
-        'inflation_total': float(last['index'] - 100.0),
+        'index_last': float(last[method_col]),
+        'inflation_total': float(last[method_col] - 100.0),
+        'index_last_laspeyres': float(last['index_laspeyres']),
+        'index_last_paasche': float(last['index_paasche']),
+        'index_last_fisher': float(last['index_fisher']),
     }
 
     return {'points': points, 'kpi': kpi}
+
+
+def _laspeyres_index(
+    df: pd.DataFrame,
+    *,
+    base_period: Optional[pd.Timestamp] = None,
+) -> dict[str, Any]:
+    """Индекс Ласпейреса — тонкая обёртка над _compute_price_index().
+
+    Сигнатура и имя сохранены отдельно ради обратной совместимости:
+    на неё напрямую завязаны существующие тесты (test_analytics.py) и
+    вызовы из basket/category/store_inflation_index по умолчанию.
+    """
+    return _compute_price_index(
+        df, method='laspeyres', base_period=base_period
+    )
+
+
+def _paasche_index(
+    df: pd.DataFrame,
+    *,
+    base_period: Optional[pd.Timestamp] = None,
+) -> dict[str, Any]:
+    """Индекс Пааше: веса — количества ТЕКУЩЕГО периода, а не базового."""
+    return _compute_price_index(
+        df, method='paasche', base_period=base_period
+    )
+
+
+def _fisher_index(
+    df: pd.DataFrame,
+    *,
+    base_period: Optional[pd.Timestamp] = None,
+) -> dict[str, Any]:
+    """Индекс Фишера: геометрическое среднее Ласпейреса и Пааше."""
+    return _compute_price_index(
+        df, method='fisher', base_period=base_period
+    )
 
 
 def purchase_counts(*, by: CountBy) -> dict[int, int]:
@@ -603,8 +701,9 @@ def basket_inflation_index(
     group_by: GroupBy = 'month',
     price_mode: PriceMode = 'paid',
     promo_mode: PromoMode = 'include',
+    index_method: IndexMethod = 'laspeyres',
 ) -> dict[str, Any]:
-    """Посчитать индекс инфляции по корзине выбранных продуктов (Ласпейрес).
+    """Посчитать индекс инфляции по корзине выбранных продуктов.
 
     Args:
         from_date: Начальная дата.
@@ -613,6 +712,11 @@ def basket_inflation_index(
         group_by: Период группировки.
         price_mode: Режим цены.
         promo_mode: Режим учёта акций.
+        index_method: 'laspeyres' (по умолчанию), 'paasche' или 'fisher'.
+            Каждая точка результата всё равно содержит все три значения
+            (index_laspeyres/index_paasche/index_fisher) для сверки —
+            этот параметр влияет только на то, что попадёт в index/
+            index_last/inflation_total.
 
     Returns:
         dict[str, Any]: Точки индекса и KPI.
@@ -620,6 +724,7 @@ def basket_inflation_index(
     group_by = _ensure_group_by(group_by)
     price_mode = _ensure_price_mode(price_mode)
     promo_mode = _ensure_promo_mode(promo_mode)
+    index_method = _ensure_index_method(index_method)
 
     df = _prepare_df_for_index(
         from_date=from_date,
@@ -629,7 +734,7 @@ def basket_inflation_index(
         price_mode=price_mode,
         group_by=group_by,
     )
-    return _laspeyres_index(df)
+    return _compute_price_index(df, method=index_method)
 
 
 def category_inflation_index(
@@ -640,8 +745,9 @@ def category_inflation_index(
     group_by: GroupBy = 'month',
     price_mode: PriceMode = 'paid',
     promo_mode: PromoMode = 'include',
+    index_method: IndexMethod = 'laspeyres',
 ) -> dict[str, Any]:
-    """Посчитать индекс инфляции внутри категории (Ласпейрес).
+    """Посчитать индекс инфляции внутри категории.
 
     Args:
         category_id: ID категории.
@@ -650,6 +756,7 @@ def category_inflation_index(
         group_by: Период группировки.
         price_mode: Режим цены.
         promo_mode: Режим учёта акций.
+        index_method: 'laspeyres' (по умолчанию), 'paasche' или 'fisher'.
 
     Returns:
         dict[str, Any]: Точки индекса и KPI.
@@ -657,6 +764,7 @@ def category_inflation_index(
     group_by = _ensure_group_by(group_by)
     price_mode = _ensure_price_mode(price_mode)
     promo_mode = _ensure_promo_mode(promo_mode)
+    index_method = _ensure_index_method(index_method)
 
     df = _prepare_df_for_index(
         from_date=from_date,
@@ -666,7 +774,7 @@ def category_inflation_index(
         price_mode=price_mode,
         group_by=group_by,
     )
-    return _laspeyres_index(df)
+    return _compute_price_index(df, method=index_method)
 
 
 def store_inflation_index(
@@ -678,8 +786,9 @@ def store_inflation_index(
     group_by: GroupBy = 'month',
     price_mode: PriceMode = 'paid',
     promo_mode: PromoMode = 'include',
+    index_method: IndexMethod = 'laspeyres',
 ) -> dict[str, Any]:
-    """Посчитать индекс инфляции по магазину (Ласпейрес).
+    """Посчитать индекс инфляции по магазину.
 
     Можно ограничить расчёт корзиной `product_ids`.
 
@@ -691,6 +800,7 @@ def store_inflation_index(
         group_by: Период группировки.
         price_mode: Режим цены.
         promo_mode: Режим учёта акций.
+        index_method: 'laspeyres' (по умолчанию), 'paasche' или 'fisher'.
 
     Returns:
         dict[str, Any]: Точки индекса и KPI.
@@ -698,6 +808,7 @@ def store_inflation_index(
     group_by = _ensure_group_by(group_by)
     price_mode = _ensure_price_mode(price_mode)
     promo_mode = _ensure_promo_mode(promo_mode)
+    index_method = _ensure_index_method(index_method)
 
     df = _prepare_df_for_index(
         from_date=from_date,
@@ -708,7 +819,7 @@ def store_inflation_index(
         price_mode=price_mode,
         group_by=group_by,
     )
-    return _laspeyres_index(df)
+    return _compute_price_index(df, method=index_method)
 
 
 def product_store_price_stats(

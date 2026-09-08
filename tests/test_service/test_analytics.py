@@ -10,7 +10,10 @@ from app.service import analytics, crud_service, purchases
 from app.service.analytics import (
     _apply_promo_filter,
     _compute_price_and_spend,
+    _ensure_index_method,
+    _fisher_index,
     _laspeyres_index,
+    _paasche_index,
 )
 
 # ---------- _laspeyres_index: чистая математика, без БД ----------
@@ -77,6 +80,114 @@ def test_laspeyres_index_empty_df_returns_empty_structure():
     assert result['points'] == []
     assert result['kpi']['index_last'] is None
     assert result['kpi']['periods'] == 0
+
+
+# ---------- _paasche_index / _fisher_index ----------
+
+def test_paasche_equals_laspeyres_when_quantities_unchanged():
+    """Если q_t == q0 для каждого товара, веса совпадают — индексы обязаны
+    совпасть.
+
+    Расхождение между Ласпейресом и Пааше — это чисто эффект смены
+    структуры потребления между периодами. Без него оба метода обязаны
+    дать одно и то же число, иначе где-то в реализации перепутаны
+    числитель со знаменателем.
+    """
+    df = pd.DataFrame({
+        'period':     ['2024-01-01', '2024-01-01', '2024-02-01', '2024-02-01'],
+        'product_id': [1, 2, 1, 2],
+        'quantity':   [10, 5, 10, 5],       # количества не меняются
+        'spend':      [100, 50, 120, 55],   # меняются только цены
+    })
+
+    laspeyres = _laspeyres_index(df)
+    paasche = _paasche_index(df)
+
+    for period in ('2024-01-01', '2024-02-01'):
+        l_point = next(p for p in laspeyres['points'] if p['period'] == period)
+        p_point = next(p for p in paasche['points'] if p['period'] == period)
+        assert l_point['index'] == pytest.approx(p_point['index'])
+
+
+def test_paasche_and_fisher_diverge_from_laspeyres_when_consumption_shifts():
+    """Хрестоматийный случай: спрос смещается к подешевевшему товару.
+
+    product 1: было 10шт по 10, стало 2шт по 30 (сильно подорожал,
+    стали покупать меньше). product 2: было 5шт по 10, стало 20шт по 22
+    (тоже подорожал, но меньше, и стали покупать значительно больше).
+
+    Ласпейрес (веса — старые количества, где дорогой товар 1 был
+    заметной долей корзины) покажет инфляцию заметно выше, чем Пааше
+    (веса — новые количества, где основную долю занимает подешевевший
+    относительно товар 2) — это и есть substitution bias, ради которого
+    вообще считают оба индекса.
+    """
+    df = pd.DataFrame({
+        'period':     ['2024-01-01', '2024-01-01', '2024-02-01', '2024-02-01'],
+        'product_id': [1, 2, 1, 2],
+        'quantity':   [10, 5, 2, 20],
+        'spend':      [100, 50, 60, 440],
+    })
+
+    laspeyres_last = _laspeyres_index(df)['points'][-1]['index']
+    paasche_last = _paasche_index(df)['points'][-1]['index']
+    fisher_last = _fisher_index(df)['points'][-1]['index']
+
+    assert laspeyres_last == pytest.approx(273.3333, rel=1e-4)
+    assert paasche_last == pytest.approx(227.2727, rel=1e-4)
+    assert laspeyres_last > paasche_last  # классический substitution bias
+
+    # Фишер — геометрическое, а не среднее арифметическое двух чисел
+    assert fisher_last == pytest.approx(
+        (laspeyres_last * paasche_last) ** 0.5, rel=1e-9
+    )
+    assert paasche_last < fisher_last < laspeyres_last
+
+
+def test_price_index_point_always_contains_all_three_methods():
+    """Любой вызов (через любую из трёх обёрток) отдаёт все три числа сразу.
+
+    Это осознанное решение ради "сверки методик" одним запросом к БД —
+    не только у выбранного через method значения, у всех трёх сразу,
+    и они должны совпадать независимо от того, какую обёртку дёрнули.
+    """
+    df = pd.DataFrame({
+        'period':     ['2024-01-01', '2024-01-01', '2024-02-01', '2024-02-01'],
+        'product_id': [1, 2, 1, 2],
+        'quantity':   [10, 5, 2, 20],
+        'spend':      [100, 50, 60, 440],
+    })
+
+    via_laspeyres = _laspeyres_index(df)['points'][-1]
+    via_paasche = _paasche_index(df)['points'][-1]
+    via_fisher = _fisher_index(df)['points'][-1]
+
+    for point in (via_laspeyres, via_paasche, via_fisher):
+        assert set(
+            ['index_laspeyres', 'index_paasche', 'index_fisher']
+        ).issubset(point.keys())
+
+    # index_laspeyres/index_paasche/index_fisher одинаковы независимо
+    # от того, какую обёртку вызвали — отличается только алиас `index`.
+    assert via_laspeyres['index_laspeyres'] == pytest.approx(
+        via_paasche['index_laspeyres']
+    ) == pytest.approx(via_fisher['index_laspeyres'])
+
+    assert via_laspeyres['index'] == pytest.approx(
+        via_laspeyres['index_laspeyres']
+    )
+    assert via_paasche['index'] == pytest.approx(via_paasche['index_paasche'])
+    assert via_fisher['index'] == pytest.approx(via_fisher['index_fisher'])
+
+
+def test_ensure_index_method_rejects_unknown_value():
+    with pytest.raises(ValueError, match='index_method'):
+        _ensure_index_method('midpoint')
+
+
+def test_ensure_index_method_accepts_known_values():
+    for method in ('laspeyres', 'paasche', 'fisher'):
+        assert _ensure_index_method(method) == method
 
 
 # ---------- _apply_promo_filter ----------
@@ -253,6 +364,63 @@ def test_basket_inflation_index_restricts_to_given_products(
     )
 
     assert result['kpi']['index_last'] == pytest.approx(120.0)
+
+
+def test_basket_inflation_index_method_paasche_diverges_from_laspeyres(
+    few_products, few_stores,
+):
+    """index_method реально доезжает от публичного API до формулы.
+
+    Числа те же, что и в test_paasche_and_fisher_diverge_from_laspeyres_
+    when_consumption_shifts (там — на голом датафрейме, здесь — через
+    полный путь: create_purchase -> БД -> _prepare_df_for_index ->
+    _compute_price_index).
+    """
+    product_a, product_b = few_products[0], few_products[1]
+
+    purchases.create_purchase(
+        store_id=few_stores[0].id, product_id=product_a.id,
+        quantity=10.0, price=100.0, purchase_date=date(2024, 1, 10),
+    )
+    purchases.create_purchase(
+        store_id=few_stores[0].id, product_id=product_b.id,
+        quantity=5.0, price=50.0, purchase_date=date(2024, 1, 10),
+    )
+    purchases.create_purchase(
+        store_id=few_stores[0].id, product_id=product_a.id,
+        quantity=2.0, price=60.0, purchase_date=date(2024, 2, 10),
+    )
+    purchases.create_purchase(
+        store_id=few_stores[0].id, product_id=product_b.id,
+        quantity=20.0, price=440.0, purchase_date=date(2024, 2, 10),
+    )
+
+    laspeyres = analytics.basket_inflation_index(
+        product_ids=[product_a.id, product_b.id], group_by='month',
+    )
+    paasche = analytics.basket_inflation_index(
+        product_ids=[product_a.id, product_b.id], group_by='month',
+        index_method='paasche',
+    )
+    fisher = analytics.basket_inflation_index(
+        product_ids=[product_a.id, product_b.id], group_by='month',
+        index_method='fisher',
+    )
+
+    assert laspeyres['kpi']['index_last'] == pytest.approx(273.3333, rel=1e-4)
+    assert paasche['kpi']['index_last'] == pytest.approx(227.2727, rel=1e-4)
+    assert fisher['kpi']['index_last'] == pytest.approx(
+        (273.3333 * 227.2727) ** 0.5, rel=1e-3
+    )
+
+    # то же самое видно и через одинаковые index_last_* в любом из трёх
+    # результатов — не только через выбранный method
+    assert laspeyres['kpi']['index_last_paasche'] == pytest.approx(
+        paasche['kpi']['index_last']
+    )
+    assert paasche['kpi']['index_last_fisher'] == pytest.approx(
+        fisher['kpi']['index_last']
+    )
 
 
 def test_category_inflation_index_restricts_to_given_category(
