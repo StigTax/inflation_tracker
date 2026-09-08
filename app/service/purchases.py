@@ -523,6 +523,61 @@ def get_purchase_date_bounds() -> tuple[Optional[date], Optional[date]]:
         return row[0], row[1]
 
 
+@logged(level=logging.INFO, skip_empty=True)
+def get_last_receipt() -> Optional[dict[str, Any]]:
+    """Вернуть последний "чек" — все покупки одной датой в одном магазине.
+
+    "Чек" здесь определяется так же, как его формирует пакетный ввод:
+    общие дата и магазин, несколько товарных строк. Последним считается
+    чек с максимальной purchase_date среди ВСЕХ покупок (магазин
+    определяется по этой же самой свежей записи — если в один день
+    покупки были в разных магазинах, берём тот, где сделана последняя
+    по id запись), а не "последние N покупок подряд": иначе в чек
+    могли бы затесаться товары из другого магазина или другого дня.
+
+    Returns:
+        dict вида {'store_id': int, 'purchase_date': date, 'rows': [...]}
+        либо None, если ни одной покупки ещё не создано.
+
+        Каждый элемент rows — {'product_id', 'quantity', 'price'},
+        совместим с create_purchases_batch(rows=...) и с prefill
+        BatchPurchaseDialog.
+    """
+    with get_session() as db:
+        last = db.execute(
+            select(Purchase.store_id, Purchase.purchase_date)
+            .order_by(Purchase.purchase_date.desc(), Purchase.id.desc())
+            .limit(1)
+        ).first()
+
+        if last is None:
+            return None
+
+        store_id, receipt_date = last
+
+        rows = db.execute(
+            select(Purchase)
+            .where(
+                Purchase.store_id == store_id,
+                Purchase.purchase_date == receipt_date,
+            )
+            .order_by(Purchase.id.asc())
+        ).scalars().all()
+
+        return {
+            'store_id': store_id,
+            'purchase_date': receipt_date,
+            'rows': [
+                {
+                    'product_id': p.product_id,
+                    'quantity': float(p.quantity),
+                    'price': float(p.total_price),
+                }
+                for p in rows
+            ],
+        }
+
+
 def get_purchase_usage_counts() -> dict[str, dict[int, int]]:
     """Возвращает счётчики покупок для отображения в UI.
 

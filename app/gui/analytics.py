@@ -139,6 +139,7 @@ class AnalyticsWidget(QWidget):
         self.kind_combo.addItem('Продукт: индекс', 'product_index')
         self.kind_combo.addItem('Категория: индекс', 'category_index')
         self.kind_combo.addItem('Магазин: индекс', 'store_index')
+        self.kind_combo.addItem('Корзина: индекс', 'basket_index')
 
         self.product_combo = QComboBox()
         self.category_combo = QComboBox()
@@ -159,7 +160,7 @@ class AnalyticsWidget(QWidget):
 
         self.product_ids_edit = QLineEdit()
         self.product_ids_edit.setPlaceholderText(
-            'ID продуктов через запятую (пусто — все)'
+            'ID продуктов через запятую'
         )
 
         self.use_dates = QCheckBox('Фильтр по датам')
@@ -388,16 +389,25 @@ class AnalyticsWidget(QWidget):
         need_product = kind == 'product_index'
         need_category = kind == 'category_index'
         need_store = kind == 'store_index'
+        need_basket = kind == 'basket_index'
+        # Поле ID продуктов — опциональный фильтр у store_index (пусто =
+        # все товары магазина), но обязательное у basket_index (сама
+        # корзина ничем, кроме списка ID, не задаётся).
+        need_product_ids = need_store or need_basket
         # Метод индекса (Ласпейрес/Пааше/Фишер) имеет смысл только там,
         # где в корзине больше одного товара — у product_index веса не
         # на чем считать, там все три метода дают одно и то же число.
-        need_index_method = need_category or need_store
+        need_index_method = need_category or need_store or need_basket
 
         self.product_combo.setEnabled(need_product)
         self.category_combo.setEnabled(need_category)
         self.store_combo.setEnabled(need_store)
-        self.product_ids_edit.setEnabled(need_store)
+        self.product_ids_edit.setEnabled(need_product_ids)
         self.index_method_combo.setEnabled(need_index_method)
+        self.product_ids_edit.setPlaceholderText(
+            'ID продуктов через запятую'
+            + (' (пусто — все)' if need_store else '')
+        )
 
         if not need_product:
             self.product_combo.setCurrentIndex(0)
@@ -405,8 +415,10 @@ class AnalyticsWidget(QWidget):
             self.category_combo.setCurrentIndex(0)
         if not need_store:
             self.store_combo.setCurrentIndex(0)
+        if not need_product_ids:
             self.product_ids_edit.clear()
         if not need_index_method:
+            # Ласпейрес по умолчанию
             self.index_method_combo.setCurrentIndex(0)
 
         self._toggle_dates()
@@ -481,6 +493,17 @@ class AnalyticsWidget(QWidget):
                 return s.name
         return 'Магазин'
 
+    def _basket_obj_name(self, product_ids: list[int]) -> str:
+        """Имя корзины для заголовка графика.
+
+        Немного товаров — перечисляем по именам (наглядно), много —
+        просто количество (иначе заголовок разъедется на пол-экрана).
+        """
+        names = [self._clean_product_label(pid) for pid in product_ids]
+        if len(names) <= 3:
+            return ', '.join(names)
+        return f'{len(names)} товаров'
+
     # ------------------- build + plots -------------------
 
     def build(self) -> None:
@@ -509,11 +532,18 @@ class AnalyticsWidget(QWidget):
         index_method = self.index_method_combo.currentData() or 'laspeyres'
 
         product_ids = None
-        if kind == 'store_index':
+        if kind in ('store_index', 'basket_index'):
             try:
                 product_ids = self._parse_ids()
             except ValueError as e:
                 QMessageBox.information(self, 'Ошибка', str(e))
+                return
+            if kind == 'basket_index' and not product_ids:
+                QMessageBox.information(
+                    self,
+                    'Ок',
+                    'Укажи хотя бы один ID продукта для корзины.'
+                )
                 return
 
         try:
@@ -617,6 +647,36 @@ class AnalyticsWidget(QWidget):
                     from_date=from_date,
                     to_date=to_date,
                     product_ids=product_ids,
+                    group_by=group_by,
+                    price_mode=price_mode,
+                    promo_mode=promo_mode,
+                    index_method=index_method,
+                )
+                return
+
+            if kind == 'basket_index':
+                # product_ids уже провалидирован выше (непустой список —
+                # без этого сама корзина не определена, в отличие от
+                # store_index, где пустой список означает "все товары").
+                obj_name = self._basket_obj_name(product_ids)
+                title = self._build_plot_title(
+                    kind=kind,
+                    obj_name=obj_name,
+                    group_by=group_by,
+                    price_mode=price_mode,
+                    promo_mode=promo_mode,
+                    from_date=from_date,
+                    to_date=to_date,
+                    index_method=index_method,
+                )
+                self._run_analytics(
+                    svc.basket_inflation_index,
+                    on_success=lambda res: self._plot_index(
+                        res, title=title, group_by=group_by,
+                    ),
+                    product_ids=product_ids,
+                    from_date=from_date,
+                    to_date=to_date,
                     group_by=group_by,
                     price_mode=price_mode,
                     promo_mode=promo_mode,
@@ -896,6 +956,7 @@ class AnalyticsWidget(QWidget):
             'product_index': 'Индекс цен по продукту',
             'category_index': 'Индекс цен по категории',
             'store_index': 'Индекс цен по магазину',
+            'basket_index': 'Индекс цен по корзине товаров',
         }
         group_map = {
             'day': 'день',

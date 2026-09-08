@@ -162,3 +162,114 @@ def test_purchase_date_defaults_to_today(single_store, product_vegetable):
 
     [created] = purchases.list_purchases_filtered(store_id=single_store.id)
     assert created.purchase_date == date.today()
+
+
+# ---------- get_last_receipt ----------
+# (используется "Повторить последний чек…" в PurchasesTab)
+
+def test_get_last_receipt_returns_none_when_no_purchases():
+    assert purchases.get_last_receipt() is None
+
+
+def test_get_last_receipt_returns_rows_from_most_recent_date_and_store(
+    few_stores, product_vegetable, product_no_category,
+):
+    old_store, new_store = few_stores[0], few_stores[1]
+
+    # Старый чек — другой магазин, другая (более ранняя) дата.
+    purchases.create_purchases_batch(
+        store_id=old_store.id,
+        purchase_date=date(2024, 1, 1),
+        rows=[{
+            'product_id': product_vegetable.id,
+            'quantity': 1.0,
+            'price': 10.0,
+        }],
+    )
+
+    # Последний чек — два товара, один магазин, одна дата.
+    purchases.create_purchases_batch(
+        store_id=new_store.id,
+        purchase_date=date(2024, 6, 1),
+        rows=[
+            {
+                'product_id': product_vegetable.id,
+                'quantity': 2.0,
+                'price': 150.0,
+            },
+            {
+                'product_id': product_no_category.id,
+                'quantity': 1.0,
+                'price': 60.0,
+            },
+        ],
+    )
+
+    receipt = purchases.get_last_receipt()
+
+    assert receipt['store_id'] == new_store.id
+    assert receipt['purchase_date'] == date(2024, 6, 1)
+    assert len(receipt['rows']) == 2
+    by_product = {r['product_id']: r for r in receipt['rows']}
+    assert by_product[product_vegetable.id] == {
+        'product_id': product_vegetable.id,
+        'quantity': 2.0,
+        'price': 150.0,
+    }
+    assert by_product[product_no_category.id] == {
+        'product_id': product_no_category.id,
+        'quantity': 1.0,
+        'price': 60.0,
+    }
+
+
+def test_get_last_receipt_ignores_older_purchases_in_same_store(
+    single_store, product_vegetable, product_no_category,
+):
+    """Старая покупка в ТОМ ЖЕ магазине, но другой датой — не часть
+    последнего чека, даже если магазин совпадает."""
+    purchases.create_purchase(
+        store_id=single_store.id, product_id=product_vegetable.id,
+        quantity=1.0, price=10.0, purchase_date=date(2024, 1, 1),
+    )
+    purchases.create_purchase(
+        store_id=single_store.id, product_id=product_no_category.id,
+        quantity=1.0, price=20.0, purchase_date=date(2024, 6, 1),
+    )
+
+    receipt = purchases.get_last_receipt()
+
+    assert receipt['purchase_date'] == date(2024, 6, 1)
+    assert len(receipt['rows']) == 1
+    assert receipt['rows'][0]['product_id'] == product_no_category.id
+
+
+def test_get_last_receipt_rows_feed_directly_into_create_purchases_batch(
+    single_store, product_vegetable, product_no_category,
+):
+    """Контракт форм: rows из get_last_receipt() должны без переделки
+    подойти в rows= для create_purchases_batch()."""
+    purchases.create_purchases_batch(
+        store_id=single_store.id,
+        purchase_date=date(2024, 6, 1),
+        rows=[
+            {
+                'product_id': product_vegetable.id,
+                'quantity': 2.0,
+                'price': 150.0,
+            },
+        ],
+    )
+
+    receipt = purchases.get_last_receipt()
+
+    created = purchases.create_purchases_batch(
+        store_id=receipt['store_id'],
+        purchase_date=date(2024, 6, 2),  # "повторяем" другим днём
+        rows=receipt['rows'],
+    )
+
+    assert created == 1
+    assert purchases.count_purchases_filtered(
+        store_id=single_store.id
+    ) == 2

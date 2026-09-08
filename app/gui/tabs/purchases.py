@@ -36,6 +36,7 @@ from app.service.purchases import (
     create_purchase,
     create_purchases_batch,
     delete_purchase,
+    get_last_receipt,
     list_purchases_filtered,
     update_purchase,
 )
@@ -248,17 +249,20 @@ class PurchasesTab(QWidget):
 
         btn_add = QPushButton('Добавить')
         btn_batch_add = QPushButton('Пакетный ввод…')
+        btn_repeat_receipt = QPushButton('Повторить последний чек…')
         btn_edit = QPushButton('Редактировать')
         btn_del = QPushButton('Удалить')
 
         btn_add.clicked.connect(self.on_add)
         btn_batch_add.clicked.connect(self.on_batch_add)
+        btn_repeat_receipt.clicked.connect(self.on_repeat_last_receipt)
         btn_edit.clicked.connect(self.on_edit)
         btn_del.clicked.connect(self.on_delete)
 
         crud_row = QHBoxLayout()
         crud_row.addWidget(btn_add)
         crud_row.addWidget(btn_batch_add)
+        crud_row.addWidget(btn_repeat_receipt)
         crud_row.addWidget(btn_edit)
         crud_row.addWidget(btn_del)
         crud_row.addStretch(1)
@@ -528,23 +532,15 @@ class PurchasesTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, 'Ошибка', str(e))
 
-    def on_batch_add(self) -> None:
-        if not list_items_safe(product_crud, limit=1):
-            QMessageBox.warning(
-                self,
-                'Нельзя',
-                'Сначала создай хотя бы один продукт.'
-            )
-            return
-        if not list_items_safe(store_crud, limit=1):
-            QMessageBox.warning(
-                self,
-                'Нельзя',
-                'Сначала создай хотя бы один магазин.'
-            )
-            return
+    def _submit_batch_dialog(self, dlg: BatchPurchaseDialog) -> None:
+        """Общий хвост для «Пакетный ввод» и «Повторить последний чек»:
+        открыть диалог, сохранить партию, обновить таблицу, показать итог.
 
-        dlg = BatchPurchaseDialog(self)
+        Вынесен отдельно, чтобы try/except/reload/сообщение не были
+        продублированы между двумя вызывающими методами — раньше это уже
+        приводило к тому, что фикс в одном месте (например, сообщение
+        об успехе) забывали продублировать в другом.
+        """
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
@@ -561,6 +557,58 @@ class PurchasesTab(QWidget):
             )
         except Exception as e:
             QMessageBox.critical(self, 'Ошибка', str(e))
+
+    def on_batch_add(self) -> None:
+        if not list_items_safe(product_crud, limit=1):
+            QMessageBox.warning(
+                self,
+                'Нельзя',
+                'Сначала создай хотя бы один продукт.'
+            )
+            return
+        if not list_items_safe(store_crud, limit=1):
+            QMessageBox.warning(
+                self,
+                'Нельзя',
+                'Сначала создай хотя бы один магазин.'
+            )
+            return
+
+        self._submit_batch_dialog(BatchPurchaseDialog(self))
+
+    def on_repeat_last_receipt(self) -> None:
+        """Открывает пакетный ввод, предзаполненный последним чеком.
+
+        "Последний чек" — все покупки с той же датой и тем же магазином,
+        что и самая свежая запись (см. get_last_receipt()). Цена и
+        количество из прошлого раза — только стартовая точка для правки,
+        а не финальные значения: цены могли измениться.
+        """
+        if not list_items_safe(product_crud, limit=1):
+            QMessageBox.warning(
+                self,
+                'Нельзя',
+                'Сначала создай хотя бы один продукт.'
+            )
+            return
+        if not list_items_safe(store_crud, limit=1):
+            QMessageBox.warning(
+                self,
+                'Нельзя',
+                'Сначала создай хотя бы один магазин.'
+            )
+            return
+
+        receipt = get_last_receipt()
+        if not receipt or not receipt.get('rows'):
+            QMessageBox.information(
+                self,
+                'Ок',
+                'Ещё нет ни одной покупки — нечего повторять.'
+            )
+            return
+
+        self._submit_batch_dialog(BatchPurchaseDialog(self, prefill=receipt))
 
     def on_edit(self) -> None:
         row = self._selected_row()

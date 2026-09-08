@@ -47,7 +47,14 @@ class BatchRowWidget(QWidget):
 
     remove_requested = pyqtSignal(object)  # emits self
 
-    def __init__(self, parent=None):
+    def __init__(
+        self,
+        parent=None,
+        *,
+        product_id: Optional[int] = None,
+        quantity: Optional[float] = None,
+        price: Optional[float] = None,
+    ):
         super().__init__(parent)
 
         self.product_combo = QComboBox()
@@ -55,16 +62,18 @@ class BatchRowWidget(QWidget):
             self.product_combo, placeholder='Начни печатать продукт…'
         )
         self.reload_products()
+        if product_id is not None:
+            set_combo_by_data(self.product_combo, product_id)
 
         self.quantity_spin = QDoubleSpinBox()
         self.quantity_spin.setDecimals(3)
         self.quantity_spin.setRange(0.001, 1_000_000)
-        self.quantity_spin.setValue(1.0)
+        self.quantity_spin.setValue(quantity if quantity is not None else 1.0)
 
         self.price_spin = QDoubleSpinBox()
         self.price_spin.setDecimals(2)
         self.price_spin.setRange(0.01, 1_000_000_000)
-        self.price_spin.setValue(0.01)
+        self.price_spin.setValue(price if price is not None else 0.01)
 
         self.comment_edit = QLineEdit()
         self.comment_edit.setPlaceholderText('Комментарий (необязательно)')
@@ -131,7 +140,9 @@ class BatchRowWidget(QWidget):
 class BatchPurchaseDialog(QDialog):
     """Диалог пакетного ввода: дата+магазин один раз, дальше — строки."""
 
-    def __init__(self, parent=None):
+    def __init__(
+        self, parent=None, *, prefill: Optional[Dict[str, Any]] = None
+    ):
         super().__init__(parent)
         self.setWindowTitle('Пакетный ввод покупок')
         self.resize(760, 480)
@@ -140,12 +151,17 @@ class BatchPurchaseDialog(QDialog):
         self.date_edit.setCalendarPopup(True)
         today = date.today()
         self.date_edit.setDate(QDate(today.year, today.month, today.day))
+        # Дату всегда предлагаем сегодняшнюю, даже если prefill пришёл из
+        # старого чека ("Повторить последний чек…") — это про "купить то
+        # же самое сегодня", а не про правку истории задним числом.
 
         self.store_combo = QComboBox()
         setup_searchable_combo(
             self.store_combo, placeholder='Начни печатать магазин…'
         )
         self._reload_stores()
+        if prefill and prefill.get('store_id') is not None:
+            set_combo_by_data(self.store_combo, prefill['store_id'])
 
         header = QFormLayout()
         header.addRow('Дата:', self.date_edit)
@@ -185,11 +201,19 @@ class BatchPurchaseDialog(QDialog):
         layout.addWidget(buttons)
         self.setLayout(layout)
 
-        # Начинаем сразу с двух строк — партия из одного товара
-        # заводится через обычный PurchaseDialog, сюда обычно идут
-        # ради нескольких позиций разом.
-        self.add_row()
-        self.add_row()
+        prefill_rows = (prefill or {}).get('rows') or []
+        if prefill_rows:
+            # Строки прошлого чека — стартовая точка для правки, а не
+            # финальные значения: цены могли измениться, количество
+            # можно поправить перед сохранением.
+            for row_data in prefill_rows:
+                self.add_row(prefill_row=row_data)
+        else:
+            # Начинаем сразу с двух строк — партия из одного товара
+            # заводится через обычный PurchaseDialog, сюда обычно идут
+            # ради нескольких позиций разом.
+            self.add_row()
+            self.add_row()
 
         self._store_id: Optional[int] = None
         self._purchase_date: Optional[date] = None
@@ -206,8 +230,25 @@ class BatchPurchaseDialog(QDialog):
         if current is not None:
             set_combo_by_data(self.store_combo, current)
 
-    def add_row(self) -> None:
-        row = BatchRowWidget(self)
+    def add_row(self, *, prefill_row: Optional[Dict[str, Any]] = None) -> None:
+        """Добавляет строку партии, опционально предзаполненную.
+
+        prefill_row — ключевой параметр (а не позиционный) специально:
+        add_row подключён напрямую к btn_add_row.clicked, а PyQt при
+        вызове слота из сигнала clicked(bool) может подставить checked
+        как первый позиционный аргумент. Через keyword-only параметр
+        такая путаница исключена в принципе, а не "случайно работает"
+        благодаря тому, что кнопка не checkable.
+        """
+        if prefill_row:
+            row = BatchRowWidget(
+                self,
+                product_id=prefill_row.get('product_id'),
+                quantity=prefill_row.get('quantity'),
+                price=prefill_row.get('price'),
+            )
+        else:
+            row = BatchRowWidget(self)
         row.remove_requested.connect(self._remove_row)
         self._rows.append(row)
         # Вставляем перед addStretch(1), а не в конец — иначе новая

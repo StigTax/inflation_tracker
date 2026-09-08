@@ -55,6 +55,15 @@ def _select_store(widget: AnalyticsWidget, store_id: int) -> None:
     )
 
 
+def _select_basket(
+    widget: AnalyticsWidget, product_ids_text: str = ''
+) -> None:
+    widget.kind_combo.setCurrentIndex(
+        widget.kind_combo.findData('basket_index')
+    )
+    widget.product_ids_edit.setText(product_ids_text)
+
+
 def test_build_runs_in_background_and_replots(
     qtbot, analytics_widget, product_vegetable
 ):
@@ -237,7 +246,9 @@ def test_store_index_invalid_basket_shows_information_and_skips_service(
 
     analytics_widget.build()
 
-    assert information_calls, 'ожидали information на невалидный id'
+    assert information_calls, (
+        'ожидали QMessageBox.information на невалидный id'
+    )
     assert analytics_widget.btn_build.isEnabled() is True
 
 
@@ -341,7 +352,8 @@ def test_product_index_does_not_pass_index_method_to_service(
         return {'points': [], 'kpi': None}
 
     monkeypatch.setattr(
-        'app.service.analytics.product_inflation_index', fake_product_index
+        'app.service.analytics.product_inflation_index',
+        fake_product_index,
     )
 
     _select_product(analytics_widget, product_vegetable.id)
@@ -352,6 +364,68 @@ def test_product_index_does_not_pass_index_method_to_service(
     )
     assert len(calls) == 1
     assert 'index_method' not in calls[0]
+
+
+# ---------- basket_index (пользовательская корзина) ----------
+
+def test_basket_index_enables_product_ids_and_index_method(
+    analytics_widget,
+):
+    _select_basket(analytics_widget)
+
+    assert analytics_widget.product_ids_edit.isEnabled() is True
+    assert analytics_widget.index_method_combo.isEnabled() is True
+    assert analytics_widget.product_combo.isEnabled() is False
+    assert analytics_widget.category_combo.isEnabled() is False
+    assert analytics_widget.store_combo.isEnabled() is False
+
+
+def test_basket_index_requires_at_least_one_product_id(
+    analytics_widget, information_calls, monkeypatch,
+):
+    def fail_if_called(**kwargs):
+        raise AssertionError(
+            'basket_inflation_index не должен вызываться без ID'
+        )
+
+    monkeypatch.setattr(
+        'app.service.analytics.basket_inflation_index', fail_if_called,
+    )
+
+    _select_basket(analytics_widget, '')
+    analytics_widget.build()
+
+    assert information_calls, 'ожидали подсказку про пустую корзину'
+    assert analytics_widget.btn_build.isEnabled() is True
+
+
+def test_basket_index_passes_product_ids_and_method_to_service(
+    qtbot, analytics_widget, monkeypatch,
+):
+    calls = []
+
+    def fake_basket_index(**kwargs):
+        calls.append(kwargs)
+        return {'points': [], 'kpi': None}
+
+    monkeypatch.setattr(
+        'app.service.analytics.basket_inflation_index',
+        fake_basket_index,
+    )
+
+    _select_basket(analytics_widget, ' 1, 2, 3 ')
+    analytics_widget.index_method_combo.setCurrentIndex(
+        analytics_widget.index_method_combo.findData('paasche')
+    )
+
+    analytics_widget.build()
+
+    qtbot.waitUntil(
+        lambda: analytics_widget.btn_build.isEnabled(), timeout=2000
+    )
+    assert len(calls) == 1
+    assert calls[0]['product_ids'] == [1, 2, 3]
+    assert calls[0]['index_method'] == 'paasche'
 
 
 def test_store_index_plot_title_uses_real_title_not_hardcoded_string(

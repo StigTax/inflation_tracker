@@ -9,6 +9,9 @@ ProductDialog, импортированный в app.gui.tabs.batch_purchase —
 quick_add_product() его и берёт.
 """
 
+from datetime import date
+
+import pytest
 from app.crud import product_crud
 from app.gui.tabs.batch_purchase import BatchPurchaseDialog, BatchRowWidget
 from app.gui.tabs.common import set_combo_by_data
@@ -83,6 +86,77 @@ def test_row_values_when_filled(qtbot, product_vegetable):
 
 def test_dialog_starts_with_two_rows(qtbot):
     dialog = BatchPurchaseDialog()
+    qtbot.addWidget(dialog)
+
+    assert len(dialog._rows) == 2
+
+
+# ---------- prefill (повторить последний чек) ----------
+
+def test_prefill_creates_rows_from_receipt_instead_of_two_empty(
+    qtbot, single_store, product_vegetable, product_no_category,
+):
+    prefill = {
+        'store_id': single_store.id,
+        'purchase_date': date(2024, 1, 1),
+        'rows': [
+            {
+                'product_id': product_vegetable.id,
+                'quantity': 2.0,
+                'price': 150.0,
+            },
+            {
+                'product_id': product_no_category.id,
+                'quantity': 1.0,
+                'price': 60.0,
+            },
+        ],
+    }
+
+    dialog = BatchPurchaseDialog(prefill=prefill)
+    qtbot.addWidget(dialog)
+
+    assert len(dialog._rows) == 2
+    assert dialog.store_combo.currentData() == single_store.id
+
+    values_by_product = {
+        row.product_combo.currentData(): row for row in dialog._rows
+    }
+    row_a = values_by_product[product_vegetable.id]
+    assert row_a.quantity_spin.value() == pytest.approx(2.0)
+    assert row_a.price_spin.value() == pytest.approx(150.0)
+
+    row_b = values_by_product[product_no_category.id]
+    assert row_b.quantity_spin.value() == pytest.approx(1.0)
+    assert row_b.price_spin.value() == pytest.approx(60.0)
+
+
+def test_prefill_date_defaults_to_today_not_old_receipt_date(
+    qtbot, single_store, product_vegetable,
+):
+    """Повторяем покупку сегодня, а не переписываем историю задним
+    числом — дата чека всегда предлагается сегодняшней, даже если
+    prefill пришёл из старого чека."""
+    prefill = {
+        'store_id': single_store.id,
+        'purchase_date': date(2020, 1, 1),
+        'rows': [{
+            'product_id': product_vegetable.id,
+            'quantity': 1.0,
+            'price': 10.0,
+        }],
+    }
+
+    dialog = BatchPurchaseDialog(prefill=prefill)
+    qtbot.addWidget(dialog)
+
+    assert dialog.date_edit.date().toPyDate() == date.today()
+
+
+def test_prefill_empty_rows_still_starts_with_two_empty_rows(qtbot):
+    """Если "последнего чека" по факту нет, prefill с пустым rows не
+    должен привести к диалогу без единой строки."""
+    dialog = BatchPurchaseDialog(prefill={'store_id': None, 'rows': []})
     qtbot.addWidget(dialog)
 
     assert len(dialog._rows) == 2

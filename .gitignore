@@ -19,3 +19,5 @@ logs/
 dist/
 build/
 *.spec
+
+run_gui.py
