@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Optional, Union
+from typing import Optional
 
 from sqlalchemy import (
     Boolean,
@@ -116,8 +116,8 @@ class Purchase(Base):
     def resolve_promo(
         *,
         is_promo: Optional[bool],
-        promo_type: Union[Optional[str], UnsetType],
-        regular_unit_price: Union[Optional[Decimal], UnsetType],
+        promo_type: Optional[str] | UnsetType,
+        regular_unit_price: Optional[Decimal] | UnsetType,
         current_is_promo: bool,
         current_promo_type: Optional[str],
         current_regular_unit_price: Optional[Decimal],

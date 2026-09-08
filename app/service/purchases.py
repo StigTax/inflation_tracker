@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from sqlalchemy import func, select
 
@@ -203,11 +203,11 @@ def update_purchase(
     product_id: Optional[int] = None,
     total_price: Optional[float] = None,
     quantity: Optional[float] = None,
-    comment: Union[Optional[str], UnsetType] = UNSET,
+    comment: Optional[str] | UnsetType = UNSET,
     purchase_date: Optional[date] = None,
     is_promo: Optional[bool] = None,
-    promo_type: Union[Optional[str], UnsetType] = UNSET,
-    regular_unit_price: Union[Optional[float], UnsetType] = UNSET,
+    promo_type: Optional[str] | UnsetType = UNSET,
+    regular_unit_price: Optional[float] | UnsetType = UNSET,
 ) -> Purchase:
     """Обновить покупку с поддержкой частичного обновления и промо-логики.
 

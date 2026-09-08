@@ -69,6 +69,8 @@ def upgrade_db(db_url: str, *, revision: str = 'head') -> None:
     cfg = Config(str(ini_path))
     cfg.set_main_option('sqlalchemy.url', db_url)
 
+    cfg.attributes['configure_logger'] = False
+
     try:
         command.upgrade(cfg, revision)
         logger.info('Схема БД синхронизирована с Alembic (%s)', revision)

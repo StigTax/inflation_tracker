@@ -102,7 +102,7 @@ class MainWindow(QMainWindow):
 
 
 def main() -> None:
-    log_file = configure_logging(enable_console=True)
+    log_file = configure_logging(enable_console=False)
 
     prepare_runtime_env()
 
@@ -111,7 +111,7 @@ def main() -> None:
     _install_excepthook(app, log_file_path=str(log_file))
 
     try:
-        init_app(enable_console_logs=True)
+        init_app(enable_console_logs=False)
     except Exception:
         logger.exception('Не удалось инициализировать БД')
 
