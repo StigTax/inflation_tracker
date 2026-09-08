@@ -58,6 +58,37 @@ jobs:
             run_gui.py
         shell: pwsh
 
+      - name: Verify bundled Alembic migrations
+        shell: pwsh
+        run: |
+          $source = Get-ChildItem "alembic\versions\*.py" |
+            Where-Object { $_.Name -ne "__init__.py" } |
+            Select-Object -ExpandProperty Name |
+            Sort-Object
+
+          $bundled = Get-ChildItem "dist\InflationTracker" `
+            -Recurse `
+            -Filter "*.py" |
+            Where-Object { $_.FullName -match "alembic[\\/]versions" } |
+            Select-Object -ExpandProperty Name |
+            Sort-Object
+
+          Write-Host "Source migrations:"
+          $source | ForEach-Object { Write-Host "  $_" }
+
+          Write-Host "Bundled migrations:"
+          $bundled | ForEach-Object { Write-Host "  $_" }
+
+          $diff = Compare-Object $source $bundled
+
+          if ($diff) {
+              Write-Host "Migration mismatch:"
+              $diff | Format-Table
+              throw "Bundled Alembic migrations do not match source migrations"
+          }
+
+          Write-Host "Alembic resources OK: $($source.Count) migrations bundled"
+
       - name: Package build
         run: |
             $ver = "${{ github.ref_name }}".TrimStart('v')

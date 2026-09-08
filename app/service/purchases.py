@@ -9,9 +9,7 @@ from typing import Any, Optional
 from sqlalchemy import func, select
 
 from app.core.db import get_session
-from app.core.sentinels import UNSET, UnsetType
 from app.crud import product_crud, store_crud
-from app.crud.base import CLEAR
 from app.crud.purchases import crud as purchase_crud
 from app.logging import logged
 from app.models import Product, Purchase
@@ -21,10 +19,8 @@ from app.validate.validators import (
     validate_positive_value,
 )
 
-logger = logging.getLogger(__name__)
 
-
-@logged(level=logging.DEBUG, skip_empty=True)
+@logged(level=logging.INFO, skip_empty=True)
 def create_purchase(
     *,
     store_id: int,
@@ -90,8 +86,8 @@ def create_purchase(
     purchase_date = validate_date_not_in_future(purchase_date)
 
     with get_session() as db:
-        product = product_crud.get_or_raise(db=db, obj_id=product_id)
-        store = store_crud.get_or_raise(db=db, obj_id=store_id)
+        product_crud.get_or_raise(db=db, obj_id=product_id)
+        store_crud.get_or_raise(db=db, obj_id=store_id)
         purchase = Purchase(
             store_id=store_id,
             product_id=product_id,
@@ -104,24 +100,12 @@ def create_purchase(
             regular_unit_price=regular_unit_price,
         )
         created = purchase_crud.create(db=db, obj_in=purchase, commit=True)
-        result = purchase_crud.get_with_normal_attr_or_raise(
+        return purchase_crud.get_with_normal_attr_or_raise(
             db=db,
             obj_id=created.id,
         )
-        logger.info(
-            'Покупка создана: id=%s, товар=%r, магазин=%r, '
-            'количество=%s, сумма=%.2f, дата=%s%s',
-            result.id,
-            getattr(product, 'name', product_id),
-            getattr(store, 'name', store_id),
-            result.quantity,
-            float(result.total_price),
-            result.purchase_date,
-            ', акция' if result.is_promo else '',
-        )
-        return result
 
-@logged(level=logging.DEBUG, skip_empty=True)
+@logged(level=logging.INFO, skip_empty=True)
 def create_purchases_batch(
     *,
     store_id: int,
@@ -164,7 +148,7 @@ def create_purchases_batch(
     purchase_date = validate_date_not_in_future(purchase_date)
 
     with get_session() as db:
-        store = store_crud.get_or_raise(db=db, obj_id=store_id)
+        store_crud.get_or_raise(db=db, obj_id=store_id)
 
         for i, row in enumerate(rows, start=1):
             try:
@@ -206,17 +190,10 @@ def create_purchases_batch(
             ))
 
         db.commit()
-        logger.info(
-            'Чек сохранён: магазин=%r, дата=%s, позиций=%s',
-            getattr(store, 'name', store_id),
-            purchase_date,
-            len(rows),
-        )
 
     return len(rows)
 
-
-@logged(level=logging.DEBUG, skip_empty=True)
+@logged(level=logging.INFO, skip_empty=True)
 def update_purchase(
     *,
     purchase_id: int,
@@ -224,11 +201,11 @@ def update_purchase(
     product_id: Optional[int] = None,
     total_price: Optional[float] = None,
     quantity: Optional[float] = None,
-    comment: Optional[str] | UnsetType = UNSET,
+    comment: Optional[str] = None,
     purchase_date: Optional[date] = None,
     is_promo: Optional[bool] = None,
-    promo_type: Optional[str] | UnsetType = UNSET,
-    regular_unit_price: Optional[float] | UnsetType = UNSET,
+    promo_type: Optional[str] = None,
+    regular_unit_price: Optional[float] = None,
 ) -> Purchase:
     """Обновить покупку с поддержкой частичного обновления и промо-логики.
 
@@ -240,9 +217,8 @@ def update_purchase(
     Промо-правила:
     - если `is_promo=False`, то `promo_type` и `regular_unit_price`
       сбрасываются в None;
-    - явное значение `promo_type`/`regular_unit_price` включает промо;
-    - для nullable-полей явный `None` означает очистить значение, а
-      `UNSET` (значение по умолчанию) — не менять его при partial update.
+    - если передан `promo_type` или `regular_unit_price`, `is_promo`
+      принудительно True.
 
     Коммит выполняется вручную (commit=False внутри CRUD), чтобы корректно
     применить промо-правила до фиксации транзакции.
@@ -253,11 +229,11 @@ def update_purchase(
         product_id: Новый ID продукта.
         total_price: Новая итоговая стоимость.
         quantity: Новое количество.
-        comment: Новый комментарий; None — очистить, UNSET — не менять.
+        comment: Новый комментарий.
         purchase_date: Новая дата покупки.
         is_promo: Явно включить/выключить промо.
-        promo_type: Тип акции; None — очистить, UNSET — не менять.
-        regular_unit_price: Обычная цена; None — очистить, UNSET — не менять.
+        promo_type: Тип акции/описание.
+        regular_unit_price: Обычная цена за единицу.
 
     Returns:
         Purchase: Обновлённая покупка (со связями).
@@ -272,56 +248,32 @@ def update_purchase(
         quantity = validate_positive_value(quantity, 'Количество товара')
     if purchase_date is not None:
         purchase_date = validate_date_not_in_future(purchase_date)
-    if regular_unit_price is not UNSET and regular_unit_price is not None:
+    if regular_unit_price is not None:
         regular_unit_price = validate_positive_value(
             regular_unit_price, 'Обычная цена за единицу'
         )
-
-    changed_fields = [
-        name
-        for name, value in (
-            ('store_id', store_id),
-            ('product_id', product_id),
-            ('total_price', total_price),
-            ('quantity', quantity),
-            ('purchase_date', purchase_date),
-            ('is_promo', is_promo),
-        )
-        if value is not None
-    ]
-    if comment is not UNSET:
-        changed_fields.append('comment')
-    if promo_type is not UNSET:
-        changed_fields.append('promo_type')
-    if regular_unit_price is not UNSET:
-        changed_fields.append('regular_unit_price')
 
     with get_session() as db:
         if product_id is not None:
             product_crud.get_or_raise(db=db, obj_id=product_id)
         if store_id is not None:
             store_crud.get_or_raise(db=db, obj_id=store_id)
-        update_fields = {
-            'store_id': store_id,
-            'product_id': product_id,
-            'total_price': total_price,
-            'quantity': quantity,
-            'purchase_date': purchase_date,
-        }
-        if comment is not UNSET:
-            update_fields['comment'] = CLEAR if comment is None else comment
-
         purchase = purchase_crud.update(
             db=db,
             obj_id=purchase_id,
             commit=False,
-            **update_fields,
+            store_id=store_id,
+            product_id=product_id,
+            total_price=total_price,
+            quantity=quantity,
+            comment=comment,
+            purchase_date=purchase_date,
         )
 
         if (
             is_promo is not None
-            or promo_type is not UNSET
-            or regular_unit_price is not UNSET
+            or promo_type is not None
+            or regular_unit_price is not None
         ):
             (
                 purchase.is_promo,
@@ -338,16 +290,10 @@ def update_purchase(
 
         db.commit()
         db.refresh(purchase)
-        result = purchase_crud.get_with_normal_attr_or_raise(
+        return purchase_crud.get_with_normal_attr_or_raise(
             db=db,
             obj_id=purchase.id,
         )
-        logger.info(
-            'Покупка обновлена: id=%s, изменены=%s',
-            result.id,
-            ', '.join(changed_fields) if changed_fields else 'нет изменений',
-        )
-        return result
 
 
 @logged(level=logging.DEBUG)
@@ -451,7 +397,7 @@ def list_purchases(
         )
 
 
-@logged(level=logging.DEBUG)
+@logged(level=logging.INFO)
 def delete_purchase(purchase_id: int) -> None:
     """Удалить покупку по ID.
 
@@ -465,28 +411,7 @@ def delete_purchase(purchase_id: int) -> None:
         ValueError: Если покупка не найдена.
     """
     with get_session() as db:
-        purchase = purchase_crud.get_with_normal_attr_or_raise(
-            db=db,
-            obj_id=purchase_id,
-        )
-        product_name = getattr(
-            getattr(purchase, 'product', None),
-            'name',
-            None,
-        )
-        store_name = getattr(
-            getattr(purchase, 'store', None),
-            'name',
-            None,
-        )
         purchase_crud.delete(db=db, obj_id=purchase_id)
-        logger.info(
-            'Покупка удалена: id=%s, товар=%r, магазин=%r, дата=%s',
-            purchase_id,
-            product_name,
-            store_name,
-            purchase.purchase_date,
-        )
 
 
 @logged(level=logging.DEBUG, skip_empty=True)
@@ -598,7 +523,7 @@ def get_purchase_date_bounds() -> tuple[Optional[date], Optional[date]]:
         return row[0], row[1]
 
 
-@logged(level=logging.DEBUG, skip_empty=True)
+@logged(level=logging.INFO, skip_empty=True)
 def get_last_receipt() -> Optional[dict[str, Any]]:
     """Вернуть последний "чек" — все покупки одной датой в одном магазине.
 
@@ -651,6 +576,30 @@ def get_last_receipt() -> Optional[dict[str, Any]]:
                 for p in rows
             ],
         }
+
+
+@logged(level=logging.DEBUG, skip_empty=True)
+def get_products_purchased_at_store(store_id: int) -> list[int]:
+    """ID продуктов, которые хоть раз покупались в данном магазине.
+
+    Нужно для GUI: при фильтрации индекса по магазину бессмысленно
+    предлагать в выборе весь каталог продуктов — только те, что вообще
+    когда-либо покупались именно здесь, иначе пользователь долистывает
+    список из сотен товаров ради пары, что реально относятся к делу.
+
+    Args:
+        store_id: ID магазина.
+
+    Returns:
+        list[int]: ID продуктов (без дублей, порядок не гарантирован).
+    """
+    with get_session() as db:
+        rows = db.execute(
+            select(Purchase.product_id)
+            .where(Purchase.store_id == store_id)
+            .distinct()
+        ).scalars().all()
+        return [int(pid) for pid in rows if pid is not None]
 
 
 def get_purchase_usage_counts() -> dict[str, dict[int, int]]:

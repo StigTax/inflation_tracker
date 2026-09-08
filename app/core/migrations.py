@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 from alembic import command
@@ -64,12 +63,11 @@ def upgrade_db(db_url: str, *, revision: str = 'head') -> None:
     if not ini_path.exists():
         raise RuntimeError(f'Не найден alembic.ini: {ini_path}')
 
-    os.environ['DB_URL'] = db_url
-
     cfg = Config(str(ini_path))
     cfg.set_main_option('sqlalchemy.url', db_url)
 
     cfg.attributes['configure_logger'] = False
+    cfg.attributes['db_url'] = db_url
 
     try:
         command.upgrade(cfg, revision)

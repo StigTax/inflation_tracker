@@ -17,7 +17,6 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QMessageBox,
     QPushButton,
     QSizePolicy,
@@ -28,12 +27,14 @@ from PyQt6.QtWidgets import (
 
 from app.crud import category_crud, product_crud, store_crud
 from app.gui.data_manager import DataManagerDialog
+from app.gui.product_picker import ProductPickerWidget
 from app.gui.qt_helpers import setup_searchable_combo
 from app.gui.ref_cache import get_cached
 from app.gui.workers import BackgroundTaskRunner
 from app.service import analytics as svc
 from app.service.crud_service import list_items
 from app.service.purchases import (
+    get_products_purchased_at_store,
     get_purchase_date_bounds,
     get_purchase_usage_counts,
 )
@@ -44,6 +45,24 @@ _GROUP_FREQ = {
     'Месяц': 'month',
     'Год': 'year',
 }
+
+
+def _ru_plural_tovar(count: int) -> str:
+    """Правильная форма слова "товар" после числительного.
+
+    1 товар, 2 товара, 5 товаров, 11 товаров, 21 товар — стандартные
+    русские правила склонения после числительных.
+    """
+    n = abs(count) % 100
+    if 11 <= n <= 14:
+        return 'товаров'
+    last = n % 10
+    if last == 1:
+        return 'товар'
+    if 2 <= last <= 4:
+        return 'товара'
+    return 'товаров'
+
 
 # Насколько большим должен быть разрыв между соседними точками (в днях),
 # чтобы график перестал соединять их линией. Идея: если между покупками
@@ -158,10 +177,7 @@ class AnalyticsWidget(QWidget):
             placeholder='Начни печатать магазин…'
         )
 
-        self.product_ids_edit = QLineEdit()
-        self.product_ids_edit.setPlaceholderText(
-            'ID продуктов через запятую'
-        )
+        self.product_picker = ProductPickerWidget()
 
         self.use_dates = QCheckBox('Фильтр по датам')
         self.date_from = QDateEdit()
@@ -191,13 +207,18 @@ class AnalyticsWidget(QWidget):
         self.index_method_combo.addItem('Фишер', 'fisher')
 
         self.kind_combo.currentIndexChanged.connect(self._on_kind_changed)
+        # Смена магазина при store_index должна тут же сузить/расширить
+        # список товаров, доступных для добавления в фильтр-корзину.
+        self.store_combo.currentIndexChanged.connect(
+            self._refresh_basket_picker_choices
+        )
 
         left_form = QFormLayout()
         left_form.addRow('Тип:', self.kind_combo)
         left_form.addRow('Продукт:', self.product_combo)
         left_form.addRow('Категория:', self.category_combo)
         left_form.addRow('Магазин:', self.store_combo)
-        left_form.addRow('Корзина (ID прод.):', self.product_ids_edit)
+        left_form.addRow('Корзина товаров:', self.product_picker)
         left_form.addRow('Метод индекса:', self.index_method_combo)
 
         left_form.addRow('', self.use_dates)
@@ -402,12 +423,8 @@ class AnalyticsWidget(QWidget):
         self.product_combo.setEnabled(need_product)
         self.category_combo.setEnabled(need_category)
         self.store_combo.setEnabled(need_store)
-        self.product_ids_edit.setEnabled(need_product_ids)
+        self.product_picker.setEnabled(need_product_ids)
         self.index_method_combo.setEnabled(need_index_method)
-        self.product_ids_edit.setPlaceholderText(
-            'ID продуктов через запятую'
-            + (' (пусто — все)' if need_store else '')
-        )
 
         if not need_product:
             self.product_combo.setCurrentIndex(0)
@@ -416,7 +433,10 @@ class AnalyticsWidget(QWidget):
         if not need_store:
             self.store_combo.setCurrentIndex(0)
         if not need_product_ids:
-            self.product_ids_edit.clear()
+            self.product_picker.clear()
+            self.product_picker.set_available_products([])
+        else:
+            self._refresh_basket_picker_choices()
         if not need_index_method:
             # Ласпейрес по умолчанию
             self.index_method_combo.setCurrentIndex(0)
@@ -424,6 +444,40 @@ class AnalyticsWidget(QWidget):
         self._toggle_dates()
 
         self.group_combo.setEnabled(True)
+
+    def _refresh_basket_picker_choices(self) -> None:
+        """Обновляет список "что можно добавить" в product_picker.
+
+        Для store_index — только товары, реально покупавшиеся в
+        выбранном магазине (меньше листания, меньше шанс промахнуться
+        мимо релевантного товара). Для basket_index — весь каталог,
+        магазин тут ни при чём. Вызывается и при смене типа аналитики,
+        и при смене выбранного магазина.
+        """
+        kind = self.kind_combo.currentData()
+
+        if kind == 'store_index':
+            store_id = self.store_combo.currentData()
+            if store_id is None:
+                self.product_picker.set_available_products([])
+                return
+            allowed_ids = set(
+                get_products_purchased_at_store(int(store_id))
+            )
+            all_products = get_cached(
+                'products', lambda: list_items(product_crud, limit=5000)
+            )
+            self.product_picker.set_available_products(
+                [p for p in all_products if p.id in allowed_ids]
+            )
+        elif kind == 'basket_index':
+            self.product_picker.set_available_products(
+                get_cached(
+                    'products', lambda: list_items(product_crud, limit=5000)
+                )
+            )
+        else:
+            self.product_picker.set_available_products([])
 
     def _set_group_by(self, value: str) -> None:
         """Выставляет group_by в combo по itemData.
@@ -435,26 +489,6 @@ class AnalyticsWidget(QWidget):
             if self.group_combo.itemData(i) == value:
                 self.group_combo.setCurrentIndex(i)
                 return
-
-    def _parse_ids(self) -> Optional[list[int]]:
-        """Парсит список id продуктов из текстового поля.
-
-        Returns:
-            Список id, если поле заполнено, иначе None.
-
-        Raises:
-            ValueError: Если найден некорректный id.
-        """
-        raw = (self.product_ids_edit.text() or '').strip()
-        if not raw:
-            return None
-        parts = [p.strip() for p in raw.split(',') if p.strip()]
-        ids: list[int] = []
-        for p in parts:
-            if not p.isdigit():
-                raise ValueError(f'Некорректный id: {p}')
-            ids.append(int(p))
-        return ids or None
 
     def _clean_product_label(self, product_id: int) -> str:
         """Имя продукта для заголовка графика, без счётчика "— N покупок".
@@ -494,15 +528,17 @@ class AnalyticsWidget(QWidget):
         return 'Магазин'
 
     def _basket_obj_name(self, product_ids: list[int]) -> str:
-        """Имя корзины для заголовка графика.
+        """Короткое имя корзины для заголовка графика.
 
-        Немного товаров — перечисляем по именам (наглядно), много —
-        просто количество (иначе заголовок разъедется на пол-экрана).
+        Полный список товаров сюда намеренно НЕ идёт — он уже виден в
+        самом виджете выбора корзины слева (список добавленных
+        товаров), а длинные названия в заголовке графика просто
+        обрезались бы или наезжали друг на друга.
         """
-        names = [self._clean_product_label(pid) for pid in product_ids]
-        if len(names) <= 3:
-            return ', '.join(names)
-        return f'{len(names)} товаров'
+        count = len(product_ids)
+        if count == 1:
+            return self._clean_product_label(product_ids[0])
+        return f'{count} {_ru_plural_tovar(count)}'
 
     # ------------------- build + plots -------------------
 
@@ -533,16 +569,12 @@ class AnalyticsWidget(QWidget):
 
         product_ids = None
         if kind in ('store_index', 'basket_index'):
-            try:
-                product_ids = self._parse_ids()
-            except ValueError as e:
-                QMessageBox.information(self, 'Ошибка', str(e))
-                return
+            product_ids = self.product_picker.selected_ids() or None
             if kind == 'basket_index' and not product_ids:
                 QMessageBox.information(
                     self,
                     'Ок',
-                    'Укажи хотя бы один ID продукта для корзины.'
+                    'Добавь хотя бы один продукт в корзину.'
                 )
                 return
 

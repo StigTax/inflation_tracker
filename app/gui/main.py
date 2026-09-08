@@ -10,7 +10,7 @@ from PyQt6.QtCore import QtMsgType, qInstallMessageHandler
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox
 
 from app.core.bootstrap import init_app
-from app.core.config_log import configure_logging
+from app.core.config_log import configure_logging, flush_logging
 from app.core.constants import (
     MAIN_WINDOW_SIZE,
     MAIN_WINDOW_TITLE,
@@ -66,6 +66,8 @@ def _install_excepthook(app: QApplication, *, log_file_path: str) -> None:
         text = ''.join(traceback.format_exception(exc_type, exc, tb))
         logger.critical('Необработанная ошибка приложения\n%s', text)
 
+        flush_logging()
+
         box = QMessageBox()
         box.setIcon(QMessageBox.Icon.Critical)
         box.setWindowTitle('Ошибка приложения')
@@ -105,7 +107,11 @@ def main() -> None:
     # В собранном GUI консоли нет: production пишет только INFO+ в файл.
     # При запуске из исходников консоль включена и показывает DEBUG+.
     is_frozen = bool(getattr(sys, 'frozen', False))
-    log_file = configure_logging(enable_console=not is_frozen)
+
+    log_file = configure_logging(
+        enable_console=not is_frozen,
+    )
+
     logger.info(
         'Запуск Inflation Tracker: режим=%s, лог=%s',
         'production' if is_frozen else 'development',
@@ -115,29 +121,51 @@ def main() -> None:
     prepare_runtime_env()
 
     app = QApplication(sys.argv)
+
     _install_qt_log_handler()
-    _install_excepthook(app, log_file_path=str(log_file))
+    _install_excepthook(
+        app,
+        log_file_path=str(log_file),
+    )
 
     try:
         init_app()
+
     except Exception:
-        logger.exception('Не удалось инициализировать БД')
+        logger.exception(
+            'Не удалось инициализировать БД'
+        )
+
+        flush_logging()
 
         box = QMessageBox()
         box.setIcon(QMessageBox.Icon.Critical)
         box.setWindowTitle('Ошибка базы данных')
         box.setText(
-            'Не удалось подготовить базу данных для работы приложения.'
+            'Не удалось подготовить базу данных '
+            'для работы приложения.'
         )
-        box.setInformativeText(f'Проверь логи: {log_file}')
+        box.setInformativeText(
+            f'Проверь логи: {log_file}'
+        )
         box.exec()
+
         return
 
     win = MainWindow()
     win.show()
+
     logger.info('Приложение готово к работе')
+
     exit_code = app.exec()
-    logger.info('Завершение Inflation Tracker: code=%s', exit_code)
+
+    logger.info(
+        'Завершение Inflation Tracker: code=%s',
+        exit_code,
+    )
+
+    flush_logging()
+
     sys.exit(exit_code)
 
 

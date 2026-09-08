@@ -56,12 +56,13 @@ def _select_store(widget: AnalyticsWidget, store_id: int) -> None:
 
 
 def _select_basket(
-    widget: AnalyticsWidget, product_ids_text: str = ''
+    widget: AnalyticsWidget, product_ids: list = (),
 ) -> None:
     widget.kind_combo.setCurrentIndex(
         widget.kind_combo.findData('basket_index')
     )
-    widget.product_ids_edit.setText(product_ids_text)
+    for product_id in product_ids:
+        widget.product_picker.add_product_id(product_id)
 
 
 def test_build_runs_in_background_and_replots(
@@ -176,10 +177,12 @@ def test_shutdown_waits_for_background_calculation(
     assert analytics_widget._task_runner.is_running() is False
 
 
-# ---------- регрессия: product_ids_edit для store_index ----------
+# ---------- регрессия: корзина товаров для store_index ----------
 # (AttributeError: 'AnalyticsWidget' object has no attribute
 # 'product_ids_edit' — виджет был проброшен в _parse_ids()/build(), но
-# никогда не создавался и не клался в форму)
+# никогда не создавался и не клался в форму; сейчас это уже другой
+# виджет — ProductPickerWidget, но регрессия на "пусто = все товары"
+# всё ещё актуальна)
 
 def test_store_index_builds_without_basket_filter(
     qtbot, analytics_widget, few_stores, monkeypatch
@@ -195,7 +198,7 @@ def test_store_index_builds_without_basket_filter(
     )
 
     _select_store(analytics_widget, few_stores[0].id)
-    assert analytics_widget.product_ids_edit.text() == ''
+    assert analytics_widget.product_picker.selected_ids() == []
 
     analytics_widget.build()
 
@@ -206,9 +209,22 @@ def test_store_index_builds_without_basket_filter(
     assert calls[0]['product_ids'] is None
 
 
-def test_store_index_builds_with_basket_filter(
-    qtbot, analytics_widget, few_stores, monkeypatch
+def test_store_index_basket_shows_only_products_sold_at_that_store(
+    qtbot, analytics_widget, few_stores, few_products, monkeypatch
 ):
+    """Ключевое требование: в корзину для store_index можно добавить
+    только товары, которые реально покупались в ЭТОМ магазине — а не
+    весь каталог. Меньше листания, меньше шанс промахнуться мимо
+    релевантного товара.
+    """
+    store = few_stores[0]
+    sold_here, never_sold_here = few_products[0], few_products[1]
+
+    purchases.create_purchase(
+        store_id=store.id, product_id=sold_here.id,
+        quantity=1.0, price=10.0, purchase_date=date(2024, 1, 1),
+    )
+
     calls = []
 
     def fake_store_index(**kwargs):
@@ -219,8 +235,12 @@ def test_store_index_builds_with_basket_filter(
         'app.service.analytics.store_inflation_index', fake_store_index
     )
 
-    _select_store(analytics_widget, few_stores[0].id)
-    analytics_widget.product_ids_edit.setText(' 1, 2, 3 ')
+    _select_store(analytics_widget, store.id)
+
+    assert analytics_widget.product_picker.add_product_id(sold_here.id)
+    assert not analytics_widget.product_picker.add_product_id(
+        never_sold_here.id
+    )
 
     analytics_widget.build()
 
@@ -228,28 +248,32 @@ def test_store_index_builds_with_basket_filter(
         lambda: analytics_widget.btn_build.isEnabled(), timeout=2000
     )
     assert len(calls) == 1
-    assert calls[0]['product_ids'] == [1, 2, 3]
+    assert calls[0]['product_ids'] == [sold_here.id]
 
 
-def test_store_index_invalid_basket_shows_information_and_skips_service(
-    analytics_widget, few_stores, monkeypatch, information_calls
+def test_store_index_basket_choices_refresh_when_store_changes(
+    analytics_widget, few_stores, product_vegetable,
 ):
-    def fail_if_called(**kwargs):
-        raise AssertionError('store_inflation_index не должен вызываться')
-
-    monkeypatch.setattr(
-        'app.service.analytics.store_inflation_index', fail_if_called
+    """Смена магазина при активном store_index тут же обновляет список
+    товаров, доступных для добавления в корзину-фильтр."""
+    store_with_sales, store_without_sales = few_stores[0], few_stores[1]
+    purchases.create_purchase(
+        store_id=store_with_sales.id, product_id=product_vegetable.id,
+        quantity=1.0, price=10.0, purchase_date=date(2024, 1, 1),
     )
 
-    _select_store(analytics_widget, few_stores[0].id)
-    analytics_widget.product_ids_edit.setText('1, abc, 3')
-
-    analytics_widget.build()
-
-    assert information_calls, (
-        'ожидали QMessageBox.information на невалидный id'
+    _select_store(analytics_widget, store_with_sales.id)
+    assert analytics_widget.product_picker.add_product_id(
+        product_vegetable.id
     )
-    assert analytics_widget.btn_build.isEnabled() is True
+
+    _select_store(analytics_widget, store_without_sales.id)
+    assert analytics_widget.product_picker.selected_ids() == [], (
+        'товар без покупок в новом магазине должен был отсеяться'
+    )
+    assert not analytics_widget.product_picker.add_product_id(
+        product_vegetable.id
+    ), 'в магазине без продаж этого товара его нельзя добавить заново'
 
 
 # ---------- index_method: Ласпейрес/Пааше/Фишер ----------
@@ -373,7 +397,7 @@ def test_basket_index_enables_product_ids_and_index_method(
 ):
     _select_basket(analytics_widget)
 
-    assert analytics_widget.product_ids_edit.isEnabled() is True
+    assert analytics_widget.product_picker.isEnabled() is True
     assert analytics_widget.index_method_combo.isEnabled() is True
     assert analytics_widget.product_combo.isEnabled() is False
     assert analytics_widget.category_combo.isEnabled() is False
@@ -385,14 +409,14 @@ def test_basket_index_requires_at_least_one_product_id(
 ):
     def fail_if_called(**kwargs):
         raise AssertionError(
-            'basket_inflation_index не должен вызываться без ID'
+            'basket_inflation_index не должен вызываться без товаров'
         )
 
     monkeypatch.setattr(
         'app.service.analytics.basket_inflation_index', fail_if_called,
     )
 
-    _select_basket(analytics_widget, '')
+    _select_basket(analytics_widget)
     analytics_widget.build()
 
     assert information_calls, 'ожидали подсказку про пустую корзину'
@@ -400,7 +424,7 @@ def test_basket_index_requires_at_least_one_product_id(
 
 
 def test_basket_index_passes_product_ids_and_method_to_service(
-    qtbot, analytics_widget, monkeypatch,
+    qtbot, analytics_widget, few_products, monkeypatch,
 ):
     calls = []
 
@@ -413,7 +437,7 @@ def test_basket_index_passes_product_ids_and_method_to_service(
         fake_basket_index,
     )
 
-    _select_basket(analytics_widget, ' 1, 2, 3 ')
+    _select_basket(analytics_widget, [p.id for p in few_products])
     analytics_widget.index_method_combo.setCurrentIndex(
         analytics_widget.index_method_combo.findData('paasche')
     )
@@ -424,7 +448,7 @@ def test_basket_index_passes_product_ids_and_method_to_service(
         lambda: analytics_widget.btn_build.isEnabled(), timeout=2000
     )
     assert len(calls) == 1
-    assert calls[0]['product_ids'] == [1, 2, 3]
+    assert set(calls[0]['product_ids']) == {p.id for p in few_products}
     assert calls[0]['index_method'] == 'paasche'
 
 

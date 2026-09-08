@@ -71,7 +71,11 @@ def configure_logging(
 
     for handler in root.handlers[:]:
         root.removeHandler(handler)
-        handler.close()
+
+        try:
+            handler.flush()
+        finally:
+            handler.close()
 
     logging.captureWarnings(True)
 
@@ -109,3 +113,12 @@ def configure_logging(
         root.setLevel(log_level)
 
     return log_file
+
+
+def flush_logging() -> None:
+    """Принудительно сбросить все активные handlers."""
+    for handler in logging.getLogger().handlers:
+        try:
+            handler.flush()
+        except (OSError, ValueError):
+            continue
