@@ -221,13 +221,14 @@ def logged(
     *,
     name: Optional[str] = None,
     logger: Optional[logging.Logger] = None,
-    level: int = logging.INFO,
+    level: int = logging.DEBUG,
     log_args: bool = True,
     log_result: bool = False,
     maxlen: int = DEFAULT_MAXLEN,
     include_defaults: bool = False,
     skip_none: bool = True,
     skip_empty: bool = False,
+    expected_exceptions: tuple[type[Exception], ...] = (ValueError,),
 ) -> Callable[[F], F]:
     """Декоратор для логирования вызова функции.
 
@@ -245,6 +246,8 @@ def logged(
         include_defaults: Добавлять ли значения по умолчанию в аргументы.
         skip_none: Пропускать ли значения None.
         skip_empty: Пропускать ли пустые значения.
+        expected_exceptions: Ожидаемые ошибки бизнес-валидации. Для них
+            пишется WARNING без traceback.
 
     Returns:
         Callable[[F], F]: Декоратор, оборачивающий функцию.
@@ -252,7 +255,7 @@ def logged(
 
     def decorator(func: F) -> F:
         log = logger or logging.getLogger(func.__module__)
-        event = name or f'{func.__module__}.{func.__qualname__}'
+        event = name or func.__qualname__
 
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any):
@@ -270,31 +273,40 @@ def logged(
                 )
                 log.log(
                     level,
-                    '%s -> start%s',
+                    'Вызов %s%s',
                     event,
                     f' ({call})' if call else '',
                 )
             else:
-                log.log(level, '%s -> start', event)
+                log.log(level, 'Вызов %s', event)
 
             try:
                 result = func(*args, **kwargs)
+            except expected_exceptions as exc:
+                ms = (time.perf_counter() - start) * 1000
+                log.warning(
+                    'Операция %s отклонена: %s (%.1f ms)',
+                    event,
+                    exc,
+                    ms,
+                )
+                raise
             except Exception:
                 ms = (time.perf_counter() - start) * 1000
-                log.exception('%s -> error (%.1fms)', event, ms)
+                log.exception('Ошибка операции %s (%.1f ms)', event, ms)
                 raise
 
             ms = (time.perf_counter() - start) * 1000
             if log_result:
                 log.log(
                     level,
-                    '%s -> ok (%.1fms) result=%s',
+                    'Завершено %s (%.1f ms), результат=%s',
                     event,
                     ms,
                     _safe_repr(result, maxlen=maxlen),
                 )
             else:
-                log.log(level, '%s -> ok (%.1fms)', event, ms)
+                log.log(level, 'Завершено %s (%.1f ms)', event, ms)
 
             return result
 

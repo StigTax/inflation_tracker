@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import date
 from typing import Any, Literal, Optional
 
@@ -9,6 +10,7 @@ import pandas as pd
 from sqlalchemy import func, select
 
 from app.core.db import get_session
+from app.logging import logged
 from app.models import Product, Purchase
 from app.service.purchases import (
     list_purchases_filtered,
@@ -26,6 +28,31 @@ _GROUP_TO_PERIOD = {
     'month': 'M',
     'year': 'Y',
 }
+
+
+logger = logging.getLogger(__name__)
+
+
+def _log_analytics_result(
+    title: str,
+    result: dict[str, Any],
+    **context: Any,
+) -> dict[str, Any]:
+    """Записать компактный итог аналитического расчёта и вернуть result."""
+    points = result.get('points') or []
+    details = ', '.join(
+        f'{key}={value}'
+        for key, value in context.items()
+        if value is not None and value != []
+    )
+    logger.info(
+        'Аналитика: %s — %s, точек=%s%s',
+        title,
+        'рассчитано' if points else 'нет данных',
+        len(points),
+        f', {details}' if details else '',
+    )
+    return result
 
 
 def _ensure_group_by(group_by: str) -> GroupBy:
@@ -590,6 +617,7 @@ def purchase_counts(*, by: CountBy) -> dict[int, int]:
         return {int(k): int(v) for k, v in rows if k is not None}
 
 
+@logged(level=logging.DEBUG, skip_empty=True)
 def product_inflation_index(
     *,
     product_id: int,
@@ -629,12 +657,30 @@ def product_inflation_index(
         group_by=group_by,
     )
     if df.empty:
-        return {'points': [], 'kpi': None}
+        return _log_analytics_result(
+            'индекс продукта',
+            {'points': [], 'kpi': None},
+            product_id=product_id,
+            from_date=from_date,
+            to_date=to_date,
+            group_by=group_by,
+            price_mode=price_mode,
+            promo_mode=promo_mode,
+        )
 
     # Для продукта нам не нужны другие товары, но на всякий случай:
     df = df[df['product_id'] == int(product_id)]
     if df.empty:
-        return {'points': [], 'kpi': None}
+        return _log_analytics_result(
+            'индекс продукта',
+            {'points': [], 'kpi': None},
+            product_id=product_id,
+            from_date=from_date,
+            to_date=to_date,
+            group_by=group_by,
+            price_mode=price_mode,
+            promo_mode=promo_mode,
+        )
 
     agg = (
         df.groupby('period', as_index=False)
@@ -648,14 +694,32 @@ def product_inflation_index(
 
     agg = agg[(agg['qty'] > 0) & (agg['spend'] > 0)]
     if agg.empty:
-        return {'points': [], 'kpi': None}
+        return _log_analytics_result(
+            'индекс продукта',
+            {'points': [], 'kpi': None},
+            product_id=product_id,
+            from_date=from_date,
+            to_date=to_date,
+            group_by=group_by,
+            price_mode=price_mode,
+            promo_mode=promo_mode,
+        )
 
     agg['avg_unit_price'] = agg['spend'] / agg['qty']
     agg = agg.sort_values('period')
 
     base_price = float(agg['avg_unit_price'].iloc[0])
     if base_price <= 0:
-        return {'points': [], 'kpi': None}
+        return _log_analytics_result(
+            'индекс продукта',
+            {'points': [], 'kpi': None},
+            product_id=product_id,
+            from_date=from_date,
+            to_date=to_date,
+            group_by=group_by,
+            price_mode=price_mode,
+            promo_mode=promo_mode,
+        )
 
     agg['index_100'] = (agg['avg_unit_price'] / base_price) * 100.0
     agg['inflation_pct_from_base'] = agg['index_100'] - 100.0
@@ -691,9 +755,19 @@ def product_inflation_index(
     for p in points:
         p['period'] = pd.to_datetime(p['period']).date().isoformat()
 
-    return {'points': points, 'kpi': kpi}
+    return _log_analytics_result(
+        'индекс продукта',
+        {'points': points, 'kpi': kpi},
+        product_id=product_id,
+        from_date=from_date,
+        to_date=to_date,
+        group_by=group_by,
+        price_mode=price_mode,
+        promo_mode=promo_mode,
+    )
 
 
+@logged(level=logging.DEBUG, skip_empty=True)
 def basket_inflation_index(
     *,
     from_date: Optional[date] = None,
@@ -735,9 +809,21 @@ def basket_inflation_index(
         price_mode=price_mode,
         group_by=group_by,
     )
-    return _compute_price_index(df, method=index_method)
+    result = _compute_price_index(df, method=index_method)
+    return _log_analytics_result(
+        'индекс корзины',
+        result,
+        products=len(product_ids or []),
+        from_date=from_date,
+        to_date=to_date,
+        group_by=group_by,
+        method=index_method,
+        price_mode=price_mode,
+        promo_mode=promo_mode,
+    )
 
 
+@logged(level=logging.DEBUG, skip_empty=True)
 def category_inflation_index(
     *,
     category_id: int,
@@ -775,9 +861,21 @@ def category_inflation_index(
         price_mode=price_mode,
         group_by=group_by,
     )
-    return _compute_price_index(df, method=index_method)
+    result = _compute_price_index(df, method=index_method)
+    return _log_analytics_result(
+        'индекс категории',
+        result,
+        category_id=category_id,
+        from_date=from_date,
+        to_date=to_date,
+        group_by=group_by,
+        method=index_method,
+        price_mode=price_mode,
+        promo_mode=promo_mode,
+    )
 
 
+@logged(level=logging.DEBUG, skip_empty=True)
 def store_inflation_index(
     *,
     store_id: int,
@@ -820,9 +918,22 @@ def store_inflation_index(
         price_mode=price_mode,
         group_by=group_by,
     )
-    return _compute_price_index(df, method=index_method)
+    result = _compute_price_index(df, method=index_method)
+    return _log_analytics_result(
+        'индекс магазина',
+        result,
+        store_id=store_id,
+        products=len(product_ids or []),
+        from_date=from_date,
+        to_date=to_date,
+        group_by=group_by,
+        method=index_method,
+        price_mode=price_mode,
+        promo_mode=promo_mode,
+    )
 
 
+@logged(level=logging.DEBUG, skip_empty=True)
 def product_store_price_stats(
     *,
     product_id: int,
@@ -859,10 +970,26 @@ def product_store_price_stats(
         group_by='day',
     )
     if df.empty:
-        return {'points': [], 'kpi': {'product_id': product_id, 'stores': 0}}
+        return _log_analytics_result(
+            'цены по магазинам',
+            {'points': [], 'kpi': {'product_id': product_id, 'stores': 0}},
+            product_id=product_id,
+            from_date=from_date,
+            to_date=to_date,
+            price_mode=price_mode,
+            promo_mode=promo_mode,
+        )
 
     if 'store_id' not in df.columns:
-        return {'points': [], 'kpi': {'product_id': product_id, 'stores': 0}}
+        return _log_analytics_result(
+            'цены по магазинам',
+            {'points': [], 'kpi': {'product_id': product_id, 'stores': 0}},
+            product_id=product_id,
+            from_date=from_date,
+            to_date=to_date,
+            price_mode=price_mode,
+            promo_mode=promo_mode,
+        )
 
     df['store_id'] = pd.to_numeric(df['store_id'], errors='coerce')
     df = df[df['store_id'].notna()]
@@ -912,9 +1039,18 @@ def product_store_price_stats(
             g.iloc[0]['avg_unit_price']
         ) if not g.empty else None,
     }
-    return {'points': points, 'kpi': kpi}
+    return _log_analytics_result(
+        'цены по магазинам',
+        {'points': points, 'kpi': kpi},
+        product_id=product_id,
+        from_date=from_date,
+        to_date=to_date,
+        price_mode=price_mode,
+        promo_mode=promo_mode,
+    )
 
 
+@logged(level=logging.DEBUG, skip_empty=True)
 def inflation_contributions(
     *,
     by: ContributionBy = 'product',
@@ -968,14 +1104,23 @@ def inflation_contributions(
         group_by=group_by,
     )
     if df.empty:
-        return {
-            'points': [],
-            'kpi': {
-                'by': by,
-                'base_period': None,
-                'target_period': None
-            }
-        }
+        return _log_analytics_result(
+            'вклад в инфляцию',
+            {
+                'points': [],
+                'kpi': {
+                    'by': by,
+                    'base_period': None,
+                    'target_period': None,
+                },
+            },
+            by=by,
+            from_date=from_date,
+            to_date=to_date,
+            group_by=group_by,
+            price_mode=price_mode,
+            promo_mode=promo_mode,
+        )
 
     df['period'] = pd.to_datetime(df['period'])
     df = df.sort_values('period')
@@ -994,14 +1139,20 @@ def inflation_contributions(
     base_agg['base_weight'] = base_agg['base_spend']
 
     if base_agg.empty:
-        return {
-            'points': [],
-            'kpi': {
-                'by': by,
-                'base_period': str(base_p.date()),
-                'target_period': str(target_p.date())
-            }
-        }
+        return _log_analytics_result(
+            'вклад в инфляцию',
+            {
+                'points': [],
+                'kpi': {
+                    'by': by,
+                    'base_period': str(base_p.date()),
+                    'target_period': str(target_p.date()),
+                },
+            },
+            by=by,
+            base_period=base_p.date(),
+            target_period=target_p.date(),
+        )
 
     # target prices
     t_slice = df[df['period'] == target_p]
@@ -1021,14 +1172,20 @@ def inflation_contributions(
         ]], on='product_id', how='inner')
     merged = merged[(merged['base_price'] > 0) & (merged['price'] > 0)]
     if merged.empty:
-        return {
-            'points': [],
-            'kpi': {
-                'by': by,
-                'base_period': str(base_p.date()),
-                'target_period': str(target_p.date())
+        return _log_analytics_result(
+            'вклад в инфляцию',
+            {
+                'points': [],
+                'kpi': {
+                    'by': by,
+                    'base_period': str(base_p.date()),
+                    'target_period': str(target_p.date()),
+                },
             },
-        }
+            by=by,
+            base_period=base_p.date(),
+            target_period=target_p.date(),
+        )
 
     merged['ratio'] = merged['price'] / merged['base_price']
 
@@ -1065,7 +1222,14 @@ def inflation_contributions(
             'target_period': str(target_p.date()),
             'covered_weight': float(sum_w),
         }
-        return {'points': points, 'kpi': kpi}
+        return _log_analytics_result(
+            'вклад в инфляцию',
+            {'points': points, 'kpi': kpi},
+            by='product',
+            base_period=base_p.date(),
+            target_period=target_p.date(),
+            top=top,
+        )
 
     # by category
     # нужна привязка product -> category
@@ -1116,4 +1280,11 @@ def inflation_contributions(
         'target_period': str(target_p.date()),
         'covered_weight': float(sum_w),
     }
-    return {'points': points, 'kpi': kpi}
+    return _log_analytics_result(
+        'вклад в инфляцию',
+        {'points': points, 'kpi': kpi},
+        by='category',
+        base_period=base_p.date(),
+        target_period=target_p.date(),
+        top=top,
+    )

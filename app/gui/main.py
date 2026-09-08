@@ -36,7 +36,7 @@ def _install_qt_log_handler() -> None:
             logger.debug('Qt: %s', message)
             return
         if mode == QtMsgType.QtInfoMsg:
-            logger.info('Qt: %s', message)
+            logger.debug('Qt: %s', message)
             return
         if mode == QtMsgType.QtWarningMsg:
             logger.warning('Qt: %s', message)
@@ -64,7 +64,7 @@ def _install_excepthook(app: QApplication, *, log_file_path: str) -> None:
 
     def _hook(exc_type, exc, tb) -> None:  # noqa: ANN001
         text = ''.join(traceback.format_exception(exc_type, exc, tb))
-        logger.critical('Unhandled exception:\n%s', text)
+        logger.critical('Необработанная ошибка приложения\n%s', text)
 
         box = QMessageBox()
         box.setIcon(QMessageBox.Icon.Critical)
@@ -102,7 +102,15 @@ class MainWindow(QMainWindow):
 
 
 def main() -> None:
-    log_file = configure_logging(enable_console=False)
+    # В собранном GUI консоли нет: production пишет только INFO+ в файл.
+    # При запуске из исходников консоль включена и показывает DEBUG+.
+    is_frozen = bool(getattr(sys, 'frozen', False))
+    log_file = configure_logging(enable_console=not is_frozen)
+    logger.info(
+        'Запуск Inflation Tracker: режим=%s, лог=%s',
+        'production' if is_frozen else 'development',
+        log_file,
+    )
 
     prepare_runtime_env()
 
@@ -111,7 +119,7 @@ def main() -> None:
     _install_excepthook(app, log_file_path=str(log_file))
 
     try:
-        init_app(enable_console_logs=False)
+        init_app()
     except Exception:
         logger.exception('Не удалось инициализировать БД')
 
@@ -127,7 +135,10 @@ def main() -> None:
 
     win = MainWindow()
     win.show()
-    sys.exit(app.exec())
+    logger.info('Приложение готово к работе')
+    exit_code = app.exec()
+    logger.info('Завершение Inflation Tracker: code=%s', exit_code)
+    sys.exit(exit_code)
 
 
 if __name__ == '__main__':

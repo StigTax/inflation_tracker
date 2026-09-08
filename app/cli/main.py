@@ -63,7 +63,8 @@ def main():
     Raises:
         SystemExit: Если выполнение команды завершилось исключением.
     """
-    configure_logging()
+    log_file = configure_logging(enable_console=True)
+    logger.info('Запуск CLI Inflation Tracker: лог=%s', log_file)
     parser = build_parser()
     args = parser.parse_args()
     configure_db(db_url=args.db_url, echo_sql=args.echo_sql)
@@ -71,8 +72,8 @@ def main():
     try:
         args.func(args)
     except Exception as e:
-        logger.error(
-            'CLI command failed: entity=%s, action=%s',
+        logger.exception(
+            'Ошибка CLI-команды: entity=%s, action=%s',
             getattr(args, 'entity', None),
             getattr(args, 'action', None),
         )

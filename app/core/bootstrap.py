@@ -1,42 +1,39 @@
-"""Bootstrap приложения: логирование + БД + миграции.
-
-Цель: единая точка старта для CLI и GUI, чтобы не было рассинхрона в том,
-какую БД открываем, где логи, и когда накатываем миграции.
-"""
+"""Bootstrap приложения: инициализация БД и миграций."""
 
 from __future__ import annotations
 
-from pathlib import Path
+import logging
 from typing import Optional
 
+from sqlalchemy.engine import make_url
+
 from app.core import db as db_module
-from app.core.config_log import configure_logging
 from app.core.db import init_db
 from app.core.migrations import ensure_db_schema
+
+logger = logging.getLogger(__name__)
 
 
 def init_app(
     *,
-    enable_console_logs: bool,
     db_url: Optional[str] = None,
-    log_dir: Optional[Path] = None,
 ) -> str:
-    """Инициализировать приложение: логирование, БД и миграции.
+    """Инициализировать БД и привести схему к актуальной ревизии.
+
+    Логирование настраивается entry point до вызова этой функции.
 
     Args:
-        enable_console_logs: Включить вывод в консоль (CLI=True, GUI=False).
         db_url: Явно заданный DB_URL. Если None — берётся из env или default.
-        log_dir: Каталог логов. Если None — дефолтный (APPDATA/.../logs).
 
     Returns:
         str: Фактический DB_URL, с которым инициализирована БД.
     """
-    configure_logging(enable_console=enable_console_logs, log_dir=log_dir)
-
     init_db(db_url)
     url = db_module.DB_URL
 
     if url and ':memory:' not in url:
         ensure_db_schema(url)
 
+    safe_url = make_url(url).render_as_string(hide_password=True)
+    logger.info('База данных готова: %s', safe_url)
     return url

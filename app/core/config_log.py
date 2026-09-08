@@ -7,7 +7,6 @@ import sys
 from datetime import date
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Optional
 
 from app.core.constants import (
     APP_NAME,
@@ -49,8 +48,8 @@ def configure_logging(
     *,
     log_level: int = logging.INFO,
     console_level: int = logging.DEBUG,
-    enable_console: Optional[bool] = None,
-    log_dir: Optional[Path] = None,
+    enable_console: bool | None = None,
+    log_dir: Path | None = None,
 ) -> Path:
     """Настроить корневое логирование приложения.
 
@@ -69,10 +68,10 @@ def configure_logging(
         Path: Путь к текущему файлу логов.
     """
     root = logging.getLogger()
-    root.setLevel(log_level)
 
-    if root.handlers:
-        root.handlers.clear()
+    for handler in root.handlers[:]:
+        root.removeHandler(handler)
+        handler.close()
 
     logging.captureWarnings(True)
 
@@ -103,5 +102,10 @@ def configure_logging(
         console_handler.setLevel(console_level)
         console_handler.setFormatter(formatter)
         root.addHandler(console_handler)
+        # Root должен пропускать самый подробный уровень из handler'ов.
+        # Иначе root=INFO отрежет DEBUG ещё до console_handler.
+        root.setLevel(min(log_level, console_level))
+    else:
+        root.setLevel(log_level)
 
     return log_file

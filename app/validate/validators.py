@@ -24,7 +24,7 @@ def ensure_item_exists(item: Optional[T], item_name: str, item_id: int) -> T:
         ValueError: Если объект не найден.
     """
     if item is None:
-        logger.info('%s with id=%s not found', item_name, item_id)
+        logger.debug('Объект не найден: %s, id=%s', item_name, item_id)
         raise ValueError(f'{item_name} с ID {item_id} не найден.')
     return item
 
@@ -47,7 +47,11 @@ def validate_date_not_in_future(value: Optional[dt_date]) -> dt_date:
     if value is None:
         return today
     if value > today:
-        logger.info('Purchase date in future blocked: %s > %s', value, today)
+        logger.debug(
+            'Отклонена дата покупки из будущего: дата=%s, сегодня=%s',
+            value,
+            today,
+        )
         raise ValueError('Дата покупки не может быть в будущем.')
     return value
 
@@ -75,7 +79,11 @@ def validate_positive_value(value: float, field_name: str) -> float:
         ValueError: Если значение меньше либо равно нулю.
     """
     if value <= 0:
-        logger.info('Non-positive value blocked: %s=%s', field_name, value)
+        logger.debug(
+            'Отклонено неположительное значение: %s=%s',
+            field_name,
+            value,
+        )
         raise ValueError(f'{field_name} не может быть меньше или равной нулю.')
     return value
 

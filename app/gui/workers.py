@@ -17,9 +17,12 @@ worker, которому просто скармливаешь функцию и
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable
 
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
+
+logger = logging.getLogger(__name__)
 
 
 class CallableWorker(QObject):
@@ -40,11 +43,18 @@ class CallableWorker(QObject):
         try:
             result = self._fn(*self._args, **self._kwargs)
         except Exception as e:  # noqa: BLE001
-            # Любое исключение из fn прокидываем в GUI как текст, а не
-            # роняем поток молча — иначе пользователь просто увидит,
-            # что "Построить" тихо ничего не сделало.
+            # Важно сохранить traceback: сигнал Qt переносит только текст
+            # ошибки, и без этой записи причина фонового сбоя потеряется.
+            logger.exception(
+                'Фоновая задача завершилась ошибкой: %s',
+                getattr(self._fn, '__qualname__', repr(self._fn)),
+            )
             self.failed.emit(str(e))
             return
+        logger.debug(
+            'Фоновая задача завершена: %s',
+            getattr(self._fn, '__qualname__', repr(self._fn)),
+        )
         self.finished.emit(result)
 
 
@@ -84,8 +94,15 @@ class BackgroundTaskRunner:
             ещё выполняется и новую пришлось проигнорировать.
         """
         if self.is_running():
+            logger.debug(
+                'Новая фоновая задача пропущена: предыдущая ещё работает'
+            )
             return False
 
+        logger.debug(
+            'Запуск фоновой задачи: %s',
+            getattr(fn, '__qualname__', repr(fn)),
+        )
         thread = QThread()
         worker = CallableWorker(fn, **kwargs)
         worker.moveToThread(thread)

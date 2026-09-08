@@ -73,6 +73,9 @@ def upgrade_db(db_url: str, *, revision: str = 'head') -> None:
 
     try:
         command.upgrade(cfg, revision)
-        logger.info('Схема БД синхронизирована с Alembic (%s)', revision)
+        logger.info(
+            'Схема БД проверена Alembic: target=%s',
+            revision,
+        )
     except Exception as e:
         raise RuntimeError('Не удалось применить миграции Alembic.') from e

@@ -22,6 +22,23 @@ from app.validate.validators import (
 ModelT = TypeVar('ModelT')
 DeleteGuard = Callable[[Session, int], None]
 
+logger = logging.getLogger(__name__)
+
+
+def _item_summary(item: Any) -> str:
+    """Короткое человекочитаемое описание ORM-объекта для логов."""
+    entity = {
+        'Category': 'категория',
+        'Store': 'магазин',
+        'Unit': 'единица измерения',
+        'Product': 'продукт',
+    }.get(item.__class__.__name__, item.__class__.__name__)
+    item_id = getattr(item, 'id', None)
+    label = getattr(item, 'name', None) or getattr(item, 'unit', None)
+    if label:
+        return f'{entity}: id={item_id}, значение={label!r}'
+    return f'{entity}: id={item_id}'
+
 
 def _column_unique(model: type, field: str) -> bool:
     """Проверить, помечено ли поле модели как уникальное (unique=True).
@@ -121,7 +138,7 @@ def _validate_foreign_keys(session: Session, obj: Any) -> None:
                 )
 
 
-@logged(level=logging.INFO, skip_empty=True)
+@logged(level=logging.DEBUG, skip_empty=True)
 def create_item(
     crud,
     obj_in: ModelT,
@@ -170,9 +187,12 @@ def create_item(
                     obj_in.name, exists
                 )
                 _validate_foreign_keys(session, obj_in)
-                return crud.create(
-                    db=session, obj_in=obj_in
+                item = crud.create(db=session, obj_in=obj_in)
+                logger.info(
+                    'Создан объект справочника: %s',
+                    _item_summary(item),
                 )
+                return item
 
     if hasattr(
         obj_in, 'unit'
@@ -213,6 +233,7 @@ def create_item(
             db=session,
             obj_in=obj_in,
         )
+        logger.info('Создан объект справочника: %s', _item_summary(item))
         return item
 
 
@@ -234,7 +255,7 @@ def _validate_fk_fields(session: Session, model: type, fields: dict) -> None:
                 )
 
 
-@logged(level=logging.INFO, skip_empty=True)
+@logged(level=logging.DEBUG, skip_empty=True)
 def update_item(
     crud,
     item_id: int,
@@ -275,7 +296,13 @@ def update_item(
                 )
                 validate_unique_name(fields['name'], exists)
                 _validate_fk_fields(session, crud.model, fields)
-                return crud.update(db=session, obj_id=item_id, **fields)
+                item = crud.update(db=session, obj_id=item_id, **fields)
+                logger.info(
+                    'Обновлён объект справочника: %s, поля=%s',
+                    _item_summary(item),
+                    ', '.join(sorted(fields)),
+                )
+                return item
 
     if 'unit' in fields and fields['unit'] is not None:
         fields['unit'] = validate_non_empty_str(
@@ -309,10 +336,18 @@ def update_item(
             obj_id=item_id,
             **fields,
         )
+        logger.info(
+            'Обновлён объект справочника: %s, поля=%s',
+            _item_summary(item),
+            ', '.join(sorted(fields)) if fields else 'нет изменений',
+        )
         return item
 
 
-@logged(level=logging.INFO)
+@logged(
+    level=logging.DEBUG,
+    expected_exceptions=(ValueError, ObjectInUseError),
+)
 def delete_item(
     crud,
     item_id: int,
@@ -346,6 +381,8 @@ def delete_item(
     """
     try:
         with get_session() as session:
+            item = crud.get_or_raise(db=session, obj_id=item_id)
+            summary = _item_summary(item)
             for guard in guards:
                 guard(session, item_id)
 
@@ -353,6 +390,7 @@ def delete_item(
                 db=session,
                 obj_id=item_id,
             )
+            logger.info('Удалён объект справочника: %s', summary)
     except IntegrityError as e:
         raise ObjectInUseError(
             'Нельзя удалить объект: он используется в связанных записях.'

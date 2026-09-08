@@ -14,7 +14,7 @@ CLI_VERBOSE_SEPARATOR_LEN = 40
 
 PURCHASES_PAGE_SIZE = 25
 
-LOG_FORMAT = '%(asctime)s - [%(levelname)s] - %(funcName)s: %(message)s'
+LOG_FORMAT = '%(asctime)s | %(levelname)-8s | %(name)s | %(message)s'
 DT_FORMAT = '%d.%m.%Y %H:%M:%S'
 
 RED = '\033[31m'
