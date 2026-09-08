@@ -9,6 +9,7 @@ pyinstaller --noconfirm \
   --windowed \
   --add-data "alembic.ini;." \
   --add-data "alembic;alembic" \
+  --add-data "app/data/seed;app/data/seed" \
   --collect-data matplotlib \
   --collect-data pandas \
   --collect-data numpy \

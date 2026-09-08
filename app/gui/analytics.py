@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QPushButton,
     QSizePolicy,
@@ -148,6 +149,11 @@ class AnalyticsWidget(QWidget):
             placeholder='Начни печатать магазин…'
         )
 
+        self.product_ids_edit = QLineEdit()
+        self.product_ids_edit.setPlaceholderText(
+            'ID продуктов через запятую (пусто — все)'
+        )
+
         self.use_dates = QCheckBox('Фильтр по датам')
         self.date_from = QDateEdit()
         self.date_to = QDateEdit()
@@ -177,6 +183,7 @@ class AnalyticsWidget(QWidget):
         left_form.addRow('Продукт:', self.product_combo)
         left_form.addRow('Категория:', self.category_combo)
         left_form.addRow('Магазин:', self.store_combo)
+        left_form.addRow('Корзина (ID прод.):', self.product_ids_edit)
 
         left_form.addRow('', self.use_dates)
         left_form.addRow('с:', self.date_from)
@@ -365,6 +372,7 @@ class AnalyticsWidget(QWidget):
         self.product_combo.setEnabled(need_product)
         self.category_combo.setEnabled(need_category)
         self.store_combo.setEnabled(need_store)
+        self.product_ids_edit.setEnabled(need_store)
 
         if not need_product:
             self.product_combo.setCurrentIndex(0)
@@ -372,6 +380,7 @@ class AnalyticsWidget(QWidget):
             self.category_combo.setCurrentIndex(0)
         if not need_store:
             self.store_combo.setCurrentIndex(0)
+            self.product_ids_edit.clear()
 
         self._toggle_dates()
 

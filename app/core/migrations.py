@@ -4,24 +4,14 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
 from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
 
+from app.core.resources import resource_base_dir
+
 logger = logging.getLogger(__name__)
-
-
-def _resource_base_dir() -> Path:
-    """Получить базовую директорию ресурсов проекта.
-
-    Returns:
-        Path: Директория, где лежат alembic.ini и папка alembic.
-    """
-    if hasattr(sys, '_MEIPASS'):
-        return Path(sys._MEIPASS).resolve()
-    return Path(__file__).resolve().parents[2]
 
 
 def _alembic_ini_path() -> Path:
@@ -30,7 +20,7 @@ def _alembic_ini_path() -> Path:
     Returns:
         Path: Абсолютный путь к alembic.ini.
     """
-    return _resource_base_dir() / 'alembic.ini'
+    return resource_base_dir() / 'alembic.ini'
 
 
 def ensure_db_schema(db_url: str) -> None:

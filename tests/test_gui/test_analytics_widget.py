@@ -35,6 +35,15 @@ def _select_product(widget: AnalyticsWidget, product_id: int) -> None:
     )
 
 
+def _select_store(widget: AnalyticsWidget, store_id: int) -> None:
+    widget.kind_combo.setCurrentIndex(
+        widget.kind_combo.findData('store_index')
+    )
+    widget.store_combo.setCurrentIndex(
+        widget.store_combo.findData(store_id)
+    )
+
+
 def test_build_runs_in_background_and_replots(
     qtbot, analytics_widget, product_vegetable
 ):
@@ -145,3 +154,87 @@ def test_shutdown_waits_for_background_calculation(
     analytics_widget.shutdown()  # не должно зависнуть или упасть
 
     assert analytics_widget._task_runner.is_running() is False
+
+
+def test_store_index_builds_without_basket_filter(
+    qtbot, analytics_widget, few_stores, monkeypatch
+):
+    """Регрессия на AttributeError из-за отсутствующего product_ids_edit.
+
+    Раньше это падало на ЛЮБОМ построении по магазину, ещё до похода в
+    сервис — поэтому здесь достаточно заглушки store_inflation_index,
+    сам факт, что до неё дошло исполнение, уже и есть проверка бага.
+    """
+    calls = []
+
+    def fake_store_index(**kwargs):
+        calls.append(kwargs)
+        return {'points': [], 'kpi': None}
+
+    monkeypatch.setattr(
+        'app.service.analytics.store_inflation_index', fake_store_index
+    )
+
+    _select_store(analytics_widget, few_stores[0].id)
+    assert analytics_widget.product_ids_edit.text() == ''
+
+    analytics_widget.build()
+
+    qtbot.waitUntil(
+        lambda: analytics_widget.btn_build.isEnabled(), timeout=2000
+    )
+    assert len(calls) == 1
+    assert calls[0]['product_ids'] is None
+
+
+def test_store_index_builds_with_basket_filter(
+    qtbot, analytics_widget, few_stores, monkeypatch
+):
+    """Значение из product_ids_edit доезжает до сервиса как list[int]."""
+    calls = []
+
+    def fake_store_index(**kwargs):
+        calls.append(kwargs)
+        return {'points': [], 'kpi': None}
+
+    monkeypatch.setattr(
+        'app.service.analytics.store_inflation_index', fake_store_index
+    )
+
+    _select_store(analytics_widget, few_stores[0].id)
+    analytics_widget.product_ids_edit.setText(' 1, 2, 3 ')
+
+    analytics_widget.build()
+
+    qtbot.waitUntil(
+        lambda: analytics_widget.btn_build.isEnabled(), timeout=2000
+    )
+    assert len(calls) == 1
+    assert calls[0]['product_ids'] == [1, 2, 3]
+
+
+def test_store_index_invalid_basket_shows_information_and_skips_service(
+    analytics_widget, few_stores, monkeypatch, information_calls
+):
+    """Мусор в корзине — мягкий QMessageBox, а не traceback наружу.
+
+    Отдельно проверяем, что store_inflation_index вообще не вызывается:
+    ValueError из _parse_ids() должен обрываться в build() ДО ухода в
+    фон, а не долетать до сервиса и не тонуть в общем except Exception.
+    """
+    def fail_if_called(**kwargs):
+        raise AssertionError('store_inflation_index не должен вызываться')
+
+    monkeypatch.setattr(
+        'app.service.analytics.store_inflation_index', fail_if_called
+    )
+
+    _select_store(analytics_widget, few_stores[0].id)
+    analytics_widget.product_ids_edit.setText('1, abc, 3')
+
+    analytics_widget.build()
+
+    assert information_calls, (
+        'ожидали QMessageBox.information на невалидный id'
+    )
+    assert analytics_widget.btn_build.isEnabled() is True
