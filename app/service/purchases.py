@@ -105,6 +105,7 @@ def create_purchase(
             obj_id=created.id,
         )
 
+
 @logged(level=logging.INFO, skip_empty=True)
 def create_purchases_batch(
     *,
@@ -192,6 +193,7 @@ def create_purchases_batch(
         db.commit()
 
     return len(rows)
+
 
 @logged(level=logging.INFO, skip_empty=True)
 def update_purchase(
