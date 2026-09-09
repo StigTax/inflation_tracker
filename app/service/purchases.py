@@ -201,7 +201,7 @@ def update_purchase(
     product_id: Optional[int] = None,
     total_price: Optional[float] = None,
     quantity: Optional[float] = None,
-    comment: Optional[str] = None,
+    comment: Any = None,
     purchase_date: Optional[date] = None,
     is_promo: Optional[bool] = None,
     promo_type: Optional[str] = None,
@@ -229,7 +229,11 @@ def update_purchase(
         product_id: Новый ID продукта.
         total_price: Новая итоговая стоимость.
         quantity: Новое количество.
-        comment: Новый комментарий.
+        comment: Новый комментарий. `None` означает "не трогать" (как и
+            остальные необязательные поля), а не "очистить" — комментарий
+            нельзя было бы отличить от "не передан", раз оба выглядят
+            как None. Чтобы явно стереть комментарий, передай
+            `app.crud.base.CLEAR`.
         purchase_date: Новая дата покупки.
         is_promo: Явно включить/выключить промо.
         promo_type: Тип акции/описание.

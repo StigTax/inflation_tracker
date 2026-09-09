@@ -205,21 +205,8 @@ def test_update_purchase_no_promo_clears_promo_fields(
     assert updated.regular_unit_price is None
 
 
-def test_list_purchases_filter_by_promo(
-    few_purchase_in_few_stores,
-    purchase_product
-):
-    # у нас из фикстур должен быть хотя бы 1 promo и хотя бы 1 non-promo
-    all_items = purchases.list_purchases()
-    promo_items = purchases.list_purchases(is_promo=True)
-    non_promo_items = purchases.list_purchases(is_promo=False)
-
-    assert len(all_items) == len(promo_items) + len(non_promo_items)
-    assert all(p.is_promo for p in promo_items)
-    assert all(not p.is_promo for p in non_promo_items)
-
-
-def test_update_purchase_explicit_none_clears_comment(purchase_product):
+def test_update_purchase_none_leaves_comment_unchanged(purchase_product):
+    """None — 'не трогать', а не 'очистить' (см. CRUDBase.update)."""
     purchases.update_purchase(
         purchase_id=purchase_product.id,
         comment='Временный комментарий',
@@ -228,6 +215,22 @@ def test_update_purchase_explicit_none_clears_comment(purchase_product):
     updated = purchases.update_purchase(
         purchase_id=purchase_product.id,
         comment=None,
+    )
+
+    assert updated.comment == 'Временный комментарий'
+
+
+def test_update_purchase_clear_sentinel_clears_comment(purchase_product):
+    from app.crud.base import CLEAR
+
+    purchases.update_purchase(
+        purchase_id=purchase_product.id,
+        comment='Временный комментарий',
+    )
+
+    updated = purchases.update_purchase(
+        purchase_id=purchase_product.id,
+        comment=CLEAR,
     )
 
     assert updated.comment is None

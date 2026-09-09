@@ -210,12 +210,20 @@ def test_store_index_builds_without_basket_filter(
 
 
 def test_store_index_basket_shows_only_products_sold_at_that_store(
-    qtbot, analytics_widget, few_stores, few_products, monkeypatch
+    qtbot, few_products, analytics_widget, few_stores, monkeypatch
 ):
     """Ключевое требование: в корзину для store_index можно добавить
     только товары, которые реально покупались в ЭТОМ магазине — а не
     весь каталог. Меньше листания, меньше шанс промахнуться мимо
     релевантного товара.
+
+    ВАЖНО: few_products обязан идти в сигнатуре ДО analytics_widget.
+    Они не зависят друг от друга напрямую, а pytest создаёт независимые
+    фикстуры в порядке их появления в списке параметров — если
+    analytics_widget создастся раньше, конструктор AnalyticsWidget уже
+    закеширует список продуктов (get_cached('products', ...)) без ещё
+    не созданных few_products, и _refresh_basket_picker_choices() потом
+    их просто не увидит.
     """
     store = few_stores[0]
     sold_here, never_sold_here = few_products[0], few_products[1]
@@ -424,8 +432,17 @@ def test_basket_index_requires_at_least_one_product_id(
 
 
 def test_basket_index_passes_product_ids_and_method_to_service(
-    qtbot, analytics_widget, few_products, monkeypatch,
+    qtbot, few_products, analytics_widget, monkeypatch, information_calls,
 ):
+    """few_products обязан идти в сигнатуре ДО analytics_widget — см.
+    подробное объяснение в
+    test_store_index_basket_shows_only_products_sold_at_that_store.
+
+    information_calls подключён как защитная сетка: если корзина вдруг
+    опять окажется пустой (например, эта же ошибка с порядком фикстур
+    вернётся в другом виде), тест упадёт на assert, а не зависнет на
+    реальном модальном окне.
+    """
     calls = []
 
     def fake_basket_index(**kwargs):
@@ -450,6 +467,9 @@ def test_basket_index_passes_product_ids_and_method_to_service(
     assert len(calls) == 1
     assert set(calls[0]['product_ids']) == {p.id for p in few_products}
     assert calls[0]['index_method'] == 'paasche'
+    assert not information_calls, (
+        'корзина не должна была оказаться пустой на этом сценарии'
+    )
 
 
 def test_store_index_plot_title_uses_real_title_not_hardcoded_string(

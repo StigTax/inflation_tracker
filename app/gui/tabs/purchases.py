@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
 
 from app.core.constants import PURCHASES_PAGE_SIZE
 from app.crud import product_crud, store_crud
+from app.crud.base import CLEAR
 from app.gui.qt_helpers import setup_searchable_combo
 from app.gui.ref_cache import get_cached
 from app.gui.table_model import DictTableModel
@@ -643,7 +644,10 @@ class PurchasesTab(QWidget):
                 total_price=v['total_price'],
                 quantity=v['quantity'],
                 purchase_date=v['purchase_date'],
-                comment=v['comment'],
+                # update_purchase(comment=None) означает "не трогать", а
+                # не "очистить" — иначе стирание текста в поле
+                # комментария в этом диалоге просто не сохранялось бы.
+                comment=v['comment'] if v['comment'] is not None else CLEAR,
                 is_promo=v['is_promo'],
                 promo_type=v['promo_type'],
                 regular_unit_price=v['regular_unit_price'],
