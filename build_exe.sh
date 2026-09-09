@@ -17,6 +17,7 @@ pyinstaller --noconfirm \
   --exclude-module numba \
   --hidden-import=pandas.core._numba \
   --hidden-import=logging.config \
+  --hidden-import=app.core.seed_csv \
   run_gui.py
 
 python - <<'PY'
